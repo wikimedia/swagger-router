@@ -1,0 +1,31 @@
+{
+  "name": "swagger-router",
+  "version": "0.0.1",
+  "description": "An efficient swagger 2 based router with support for multiple APIs. For use in RESTBase.",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gwicke/swagger-router.git"
+  },
+  "keywords": [
+    "swagger2",
+    "router",
+    "tree",
+    "restbase"
+  ],
+  "author": "Gabriel Wicke <gwicke@wikimedia.org>",
+  "license": "Apache2",
+  "bugs": {
+    "url": "https://github.com/gwicke/swagger-router/issues"
+  },
+  "dependencies": {
+    "es6-shim": "^0.22.1"
+  },
+  "devDependencies": {
+    "mocha": "x.x.x",
+    "mocha-jshint": "0.0.9"
+  }
+}
