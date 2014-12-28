@@ -1,8 +1,7 @@
 "use strict";
 
-// For Map primarily
+// For Map. Not used in the fast path.
 require("es6-shim");
-
 
 /*
  * A node in the lookup graph.
@@ -92,18 +91,16 @@ Node.prototype.keys = function () {
     }
 };
 
+
+/*
+ * The main router object
+ */
 function Router () {
     this._root = new Node();
     // Map for sharing of sub-trees corresponding to the same specs, using
-    // object identity.
+    // object identity on the spec fragment. Not yet implemented.
     this._nodes = new Map();
 }
-//- interface:
-//    - `#addSpec(spec, [prefix])`
-//    - `#delSpec(spec, [prefix])`
-//    - `#route(path)`
-//    - path / prefix are arrays by default
-
 
 function normalizePath (path) {
     if (Array.isArray(path)) {
@@ -174,10 +171,18 @@ Router.prototype.addSpec = function addSpec(spec, prefix) {
 
 Router.prototype.delSpec = function delSpec(spec, prefix) {
     // Possible implementation:
-    // - perform a *recursive* lookup for the leaf node
-    // -
+    // - Perform a *recursive* lookup for each leaf node.
+    // - Walk up the tree and remove nodes as long as `.hasChildren()` is
+    //   false.
+    // This will work okay in a tree, but would clash with subtree sharing in
+    // a graph. We should perform some benchmarks to see if subtree sharing is
+    // worth it. Until then we probably don't need spec deletion anyway, as we
+    // can always re-build the entire router from scratch.
+    throw new Error("Not implemented");
 };
 
+// Extend an existing route tree with a new path by walking the existing tree
+// and inserting new subtrees at the desired location.
 Router.prototype._extend = function route(path, node, value) {
     var params = {};
     var origNode = node;
@@ -194,6 +199,7 @@ Router.prototype._extend = function route(path, node, value) {
     node.value = value;
 };
 
+// Lookup worker.
 Router.prototype._lookup = function route(path, node) {
     var params = {};
     var prevNode;
