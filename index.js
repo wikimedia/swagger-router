@@ -14,8 +14,8 @@ function Node () {
 
     // Internal properties.
     this._map = {};
-    this._name = undefined;
-    this._wildcard = undefined;
+    this._name = null;
+    this._wildcard = null;
 }
 
 Node.prototype.set = function(key, value) {
