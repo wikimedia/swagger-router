@@ -3,6 +3,9 @@
 // For Map. Not used in the fast path.
 require("es6-shim");
 
+// a global variable holding the ID the next created node should have
+var nextNodeId = 0;
+
 /*
  * A node in the lookup graph.
  *
@@ -11,7 +14,9 @@ require("es6-shim");
 function Node () {
     // The value for a path ending on this node. Public property.
     this.value = null;
-
+    // this node's ID
+    this.id = nextNodeId++;
+    
     // Internal properties.
     this._map = {};
     this._name = null;
@@ -240,6 +245,17 @@ Router.prototype._lookup = function route(path, node) {
 Router.prototype.lookup = function route(path) {
     path = normalizePath(path);
     return this._lookup(path, this._root);
+};
+
+/**
+ * Reports the number of nodes created by the router. Note that
+ * this is the total number of created nodes; if some are deleted,
+ * this number is not decreased.
+ * 
+ * @return {Number} the total number of created nodes
+ */
+Router.prototype.noNodes = function () {
+    return nextNodeId;
 };
 
 module.exports = Router;
