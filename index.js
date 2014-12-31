@@ -3,8 +3,60 @@
 // For Map. Not used in the fast path.
 require("es6-shim");
 
+
+/***
+ * :SECTION 1:
+ * Private module variables and methods
+ ***/
+
 // a global variable holding the ID the next created node should have
 var nextNodeId = 0;
+
+function normalizePath (path) {
+    if (Array.isArray(path)) {
+        // Nothing to be done
+        return path;
+    } else if (path.split) {
+        return path.replace(/^\//, '').split(/\//);
+    } else {
+        throw new Error("Invalid path: " + path);
+    }
+}
+
+function parsePattern (pattern) {
+    var bits = normalizePath(pattern);
+    // Re-join {/var} patterns
+    for (var i = 0; i < bits.length - 1; i++) {
+        if (bits[i] === '{' && /}$/.test(bits[i+1])) {
+            bits.splice(i, 2, '{/' + bits[i+1]);
+        }
+    }
+    // Parse pattern segments and convert them to objects to be consumed by
+    // Node.set().
+    return bits.map(function(bit) {
+        // Support named but fixed values as
+        // {domain:en.wikipedia.org}
+        var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
+        if (m) {
+            if (m[1]) {
+                throw new Error("Modifiers are not yet implemented!");
+            }
+            return {
+                modifier: m[1],
+                name: m[2],
+                pattern: m[3]
+            };
+        } else {
+            return bit;
+        }
+    });
+}
+
+
+/***
+ * :SECTION 2:
+ * Module class definitions
+ ***/
 
 /*
  * A node in the lookup graph.
@@ -105,46 +157,6 @@ function Router () {
     // Map for sharing of sub-trees corresponding to the same specs, using
     // object identity on the spec fragment. Not yet implemented.
     this._nodes = new Map();
-}
-
-function normalizePath (path) {
-    if (Array.isArray(path)) {
-        // Nothing to be done
-        return path;
-    } else if (path.split) {
-        return path.replace(/^\//, '').split(/\//);
-    } else {
-        throw new Error("Invalid path: " + path);
-    }
-}
-
-function parsePattern (pattern) {
-    var bits = normalizePath(pattern);
-    // Re-join {/var} patterns
-    for (var i = 0; i < bits.length - 1; i++) {
-        if (bits[i] === '{' && /}$/.test(bits[i+1])) {
-            bits.splice(i, 2, '{/' + bits[i+1]);
-        }
-    }
-    // Parse pattern segments and convert them to objects to be consumed by
-    // Node.set().
-    return bits.map(function(bit) {
-        // Support named but fixed values as
-        // {domain:en.wikipedia.org}
-        var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
-        if (m) {
-            if (m[1]) {
-                throw new Error("Modifiers are not yet implemented!");
-            }
-            return {
-                modifier: m[1],
-                name: m[2],
-                pattern: m[3]
-            };
-        } else {
-            return bit;
-        }
-    });
 }
 
 Router.prototype._buildTree = function(segments, value) {
