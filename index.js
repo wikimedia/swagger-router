@@ -13,24 +13,27 @@ require("es6-shim");
 var nextNodeId = 0;
 
 function normalizePath (path) {
-    if (Array.isArray(path)) {
-        // Nothing to be done
-        return path;
-    } else if (path.split) {
-        return path.replace(/^\//, '').split(/\//);
-    } else {
+    if (path.split) {
+        path = path.replace(/^\//, '').split(/\//);
+    } else if(!(Array.isArray(path))) {
         throw new Error("Invalid path: " + path);
     }
+    // Re-join {/var} patterns
+    for (var i = 0; i < path.length - 1; i++) {
+        if (/{$/.test(path[i]) && /}$/.test(path[i+1])) {
+            var rest = path[i].replace(/{$/, '');
+            if (rest.length) {
+                path.splice(i, 2, rest, '{/' + path[i+1]);
+            } else {
+                path.splice(i, 2, '{/' + path[i+1]);
+            }
+        }
+    }
+    return path;
 }
 
 function parsePattern (pattern) {
     var bits = normalizePath(pattern);
-    // Re-join {/var} patterns
-    for (var i = 0; i < bits.length - 1; i++) {
-        if (bits[i] === '{' && /}$/.test(bits[i+1])) {
-            bits.splice(i, 2, '{/' + bits[i+1]);
-        }
-    }
     // Parse pattern segments and convert them to objects to be consumed by
     // Node.set().
     return bits.map(function(bit) {
