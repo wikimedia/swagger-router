@@ -152,6 +152,90 @@ Node.prototype.keys = function () {
 };
 
 
+/**
+ * Represents a URI object which can optionally contain and
+ * bind optional variables encountered in the URI string
+ *
+ * @param {String|URI} uri the URI path or object to create a new URI from
+ * @param {Object} params the values for variables encountered in the URI path (optional)
+ */
+function URI(uri, params) {
+    if (uri.constructor === URI) {
+        this._uri = [];
+        uri._uri.forEach(function (item) {
+            if (item.constructor === Object) {
+                this._uri.push({
+                    modifier: item.modifier,
+                    name: item.name,
+                    pattern: item.pattern
+                });
+            } else {
+                this._uri.push(item.concat(''));
+            }
+        }, this);
+    } else if (uri.constructor === String || uri.constructor === Array) {
+        this._uri = parsePattern(uri);
+    }
+    this._str = null;
+    if (params) {
+        this.bind(params);
+    }
+}
+
+/**
+ * Binds the provided parameter values to URI's variable components
+ *
+ * @param {Object} params the parameters (and their values) to bind
+ * @return {URI} this URI object
+ */
+URI.prototype.bind = function (params) {
+    // look only for parameter keys which match
+    // variables in the URI
+    this._uri.forEach(function (item) {
+        if(item && item.constructor === Object && params[item.name]) {
+            item.pattern = params[item.name];
+            // we have changed a value, so invalidate the string cache
+            this._str = null;
+        }
+    }, this);
+    return this;
+};
+
+/**
+ * Builds and returns the full, bounded string path for this URI object
+ *
+ * @return {String} the complete path of this URI object
+ */
+URI.prototype.toString = function () {
+    if (this._str) {
+        // there is a cached version of the URI's string
+        return this._str.concat('');
+    }
+    this._str = '';
+    this._uri.forEach(function (item) {
+        if (item.constructor === Object) {
+            if (item.pattern) {
+                // there is a known value for this variable,
+                // so use it
+                this._str += '/' + encodeURIComponent(item.pattern);
+            } else if (item.modifer) {
+                // we are dealing with a modifier, and there
+                // seems to be no value, so simply ignore the
+                // component
+                this._str += '';
+            } else {
+                // we have a variable component, but no value,
+                // so let's just return the variable name
+                this._str += '/{' + item.name + '}';
+            }
+        } else {
+            this._str += '/' + item;
+        }
+    }, this);
+    return this._str.concat('');
+};
+
+
 /*
  * The main router object
  */
