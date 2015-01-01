@@ -189,6 +189,10 @@ function URI(uri, params) {
  * @return {URI} this URI object
  */
 URI.prototype.bind = function (params) {
+    if (!params || params.constructor !== Object) {
+        // wrong params format
+        return this;
+    }
     // look only for parameter keys which match
     // variables in the URI
     this._uri.forEach(function (item) {
