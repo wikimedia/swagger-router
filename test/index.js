@@ -125,7 +125,7 @@ var expectations = {
 
 var domains = ['en.wikipedia.org','de.wikipedia.org'];
 
-var router = new Router();
+var router = new Router.Router();
 specs.forEach(function(spec) {
     domains.forEach(function(domain) {
         router.addSpec(spec, '/{domain:' + domain + '}/v1');

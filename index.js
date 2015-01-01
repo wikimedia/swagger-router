@@ -361,4 +361,9 @@ Router.prototype.noNodes = function () {
     return nextNodeId;
 };
 
-module.exports = Router;
+module.exports = {
+    Router: Router,
+    URI: URI,
+    Node: Node
+};
+
