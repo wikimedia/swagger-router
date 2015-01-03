@@ -263,17 +263,33 @@ Router.prototype._buildTree = function(segments, value) {
 };
 
 Router.prototype.addSpec = function addSpec(spec, prefix) {
-    var self = this;
+    var spec_root, instance_root, params = {};
     if (!spec || !spec.paths) {
         throw new Error("No spec or no paths defined in spec!");
     }
     // Get the prefix
     prefix = parsePattern(prefix || []);
-
-    for (var path in spec.paths) {
-        // Skip over the empty first element
-        var segments = parsePattern(path);
-        self._extend(prefix.concat(segments), self._root, spec.paths[path]);
+    // do we know this spec already ?
+    if (!this._nodes.has(spec)) {
+        // this is a new spec, so we need to build its tree
+        spec_root = new Node();
+        for (var path in spec.paths) {
+            var segments = parsePattern(path);
+            this._extend(segments, spec_root, spec.paths[path]);
+        }
+        // add it to the spec map
+        this._nodes.set(spec, spec_root);
+    }
+    // create the prefix nodes and connect them to the spec sub-tree
+    spec_root = this._nodes.get(spec);
+    this._extend(prefix, this._root, null);
+    instance_root = this._root;
+    for (var idx = 0; idx < prefix.length; idx++) {
+        instance_root = instance_root.get(prefix[idx], params);
+    }
+    instance_root._wildcard = spec_root._wildcard;
+    for (var key in spec_root._map) {
+        instance_root._map[key] = spec_root._map[key];
     }
 };
 
