@@ -123,9 +123,9 @@ var expectations = {
     '/en.wikipedia.org/v1//': null
 };
 
-var domains = ['en.wikipedia.org','de.wikipedia.org'];
+var domains = ['en.wikipedia.org','de.wikipedia.org', 'fr.wikipedia.org', 'es.wikipedia.org'];
 
-var router = new Router();
+var router = new Router.Router();
 specs.forEach(function(spec) {
     domains.forEach(function(domain) {
         router.addSpec(spec, '/{domain:' + domain + '}/v1');
@@ -140,5 +140,12 @@ describe('swagger-router', function() {
             deepEqual(router.lookup(key), val);
         });
     });
+    
+    it('node count', function () {
+        // we should have 24 nodes + 2 for each test domain (domain/v1 prefix)
+        // 24 nodes = 22 path nodes in the test spec + the spec root node + the root node
+        deepEqual(router.noNodes(), 24 + 2 * domains.length);
+    });
+    
 });
 

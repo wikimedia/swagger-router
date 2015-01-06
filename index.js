@@ -3,6 +3,64 @@
 // For Map. Not used in the fast path.
 require("es6-shim");
 
+
+/***
+ * :SECTION 1:
+ * Private module variables and methods
+ ***/
+
+// a global variable holding the ID the next created node should have
+var nextNodeId = 0;
+
+function normalizePath (path) {
+    if (path.split) {
+        path = path.replace(/^\//, '').split(/\//);
+    } else if(!(Array.isArray(path))) {
+        throw new Error("Invalid path: " + path);
+    }
+    // Re-join {/var} patterns
+    for (var i = 0; i < path.length - 1; i++) {
+        if (/{$/.test(path[i]) && /}$/.test(path[i+1])) {
+            var rest = path[i].replace(/{$/, '');
+            if (rest.length) {
+                path.splice(i, 2, rest, '{/' + path[i+1]);
+            } else {
+                path.splice(i, 2, '{/' + path[i+1]);
+            }
+        }
+    }
+    return path;
+}
+
+function parsePattern (pattern) {
+    var bits = normalizePath(pattern);
+    // Parse pattern segments and convert them to objects to be consumed by
+    // Node.set().
+    return bits.map(function(bit) {
+        // Support named but fixed values as
+        // {domain:en.wikipedia.org}
+        var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
+        if (m) {
+            if (m[1]) {
+                throw new Error("Modifiers are not yet implemented!");
+            }
+            return {
+                modifier: m[1],
+                name: m[2],
+                pattern: m[3]
+            };
+        } else {
+            return bit;
+        }
+    });
+}
+
+
+/***
+ * :SECTION 2:
+ * Module class definitions
+ ***/
+
 /*
  * A node in the lookup graph.
  *
@@ -11,7 +69,9 @@ require("es6-shim");
 function Node () {
     // The value for a path ending on this node. Public property.
     this.value = null;
-
+    // this node's ID
+    this.id = nextNodeId++;
+    
     // Internal properties.
     this._map = {};
     this._name = null;
@@ -92,6 +152,94 @@ Node.prototype.keys = function () {
 };
 
 
+/**
+ * Represents a URI object which can optionally contain and
+ * bind optional variables encountered in the URI string
+ *
+ * @param {String|URI} uri the URI path or object to create a new URI from
+ * @param {Object} params the values for variables encountered in the URI path (optional)
+ */
+function URI(uri, params) {
+    if (uri.constructor === URI) {
+        this._uri = [];
+        uri._uri.forEach(function (item) {
+            if (item.constructor === Object) {
+                this._uri.push({
+                    modifier: item.modifier,
+                    name: item.name,
+                    pattern: item.pattern
+                });
+            } else {
+                this._uri.push(item.concat(''));
+            }
+        }, this);
+    } else if (uri.constructor === String || uri.constructor === Array) {
+        this._uri = parsePattern(uri);
+    }
+    this._str = null;
+    if (params) {
+        this.bind(params);
+    }
+}
+
+/**
+ * Binds the provided parameter values to URI's variable components
+ *
+ * @param {Object} params the parameters (and their values) to bind
+ * @return {URI} this URI object
+ */
+URI.prototype.bind = function (params) {
+    if (!params || params.constructor !== Object) {
+        // wrong params format
+        return this;
+    }
+    // look only for parameter keys which match
+    // variables in the URI
+    this._uri.forEach(function (item) {
+        if(item && item.constructor === Object && params[item.name]) {
+            item.pattern = params[item.name];
+            // we have changed a value, so invalidate the string cache
+            this._str = null;
+        }
+    }, this);
+    return this;
+};
+
+/**
+ * Builds and returns the full, bounded string path for this URI object
+ *
+ * @return {String} the complete path of this URI object
+ */
+URI.prototype.toString = function () {
+    if (this._str) {
+        // there is a cached version of the URI's string
+        return this._str.concat('');
+    }
+    this._str = '';
+    this._uri.forEach(function (item) {
+        if (item.constructor === Object) {
+            if (item.pattern) {
+                // there is a known value for this variable,
+                // so use it
+                this._str += '/' + encodeURIComponent(item.pattern);
+            } else if (item.modifer) {
+                // we are dealing with a modifier, and there
+                // seems to be no value, so simply ignore the
+                // component
+                this._str += '';
+            } else {
+                // we have a variable component, but no value,
+                // so let's just return the variable name
+                this._str += '/{' + item.name + '}';
+            }
+        } else {
+            this._str += '/' + item;
+        }
+    }, this);
+    return this._str.concat('');
+};
+
+
 /*
  * The main router object
  */
@@ -100,46 +248,6 @@ function Router () {
     // Map for sharing of sub-trees corresponding to the same specs, using
     // object identity on the spec fragment. Not yet implemented.
     this._nodes = new Map();
-}
-
-function normalizePath (path) {
-    if (Array.isArray(path)) {
-        // Nothing to be done
-        return path;
-    } else if (path.split) {
-        return path.replace(/^\//, '').split(/\//);
-    } else {
-        throw new Error("Invalid path: " + path);
-    }
-}
-
-function parsePattern (pattern) {
-    var bits = normalizePath(pattern);
-    // Re-join {/var} patterns
-    for (var i = 0; i < bits.length - 1; i++) {
-        if (bits[i] === '{' && /}$/.test(bits[i+1])) {
-            bits.splice(i, 2, '{/' + bits[i+1]);
-        }
-    }
-    // Parse pattern segments and convert them to objects to be consumed by
-    // Node.set().
-    return bits.map(function(bit) {
-        // Support named but fixed values as
-        // {domain:en.wikipedia.org}
-        var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
-        if (m) {
-            if (m[1]) {
-                throw new Error("Modifiers are not yet implemented!");
-            }
-            return {
-                modifier: m[1],
-                name: m[2],
-                pattern: m[3]
-            };
-        } else {
-            return bit;
-        }
-    });
 }
 
 Router.prototype._buildTree = function(segments, value) {
@@ -155,17 +263,33 @@ Router.prototype._buildTree = function(segments, value) {
 };
 
 Router.prototype.addSpec = function addSpec(spec, prefix) {
-    var self = this;
+    var spec_root, instance_root, params = {};
     if (!spec || !spec.paths) {
         throw new Error("No spec or no paths defined in spec!");
     }
     // Get the prefix
     prefix = parsePattern(prefix || []);
-
-    for (var path in spec.paths) {
-        // Skip over the empty first element
-        var segments = parsePattern(path);
-        self._extend(prefix.concat(segments), self._root, spec.paths[path]);
+    // do we know this spec already ?
+    if (!this._nodes.has(spec)) {
+        // this is a new spec, so we need to build its tree
+        spec_root = new Node();
+        for (var path in spec.paths) {
+            var segments = parsePattern(path);
+            this._extend(segments, spec_root, spec.paths[path]);
+        }
+        // add it to the spec map
+        this._nodes.set(spec, spec_root);
+    }
+    // create the prefix nodes and connect them to the spec sub-tree
+    spec_root = this._nodes.get(spec);
+    this._extend(prefix, this._root, null);
+    instance_root = this._root;
+    for (var idx = 0; idx < prefix.length; idx++) {
+        instance_root = instance_root.get(prefix[idx], params);
+    }
+    instance_root._wildcard = spec_root._wildcard;
+    for (var key in spec_root._map) {
+        instance_root._map[key] = spec_root._map[key];
     }
 };
 
@@ -242,4 +366,20 @@ Router.prototype.lookup = function route(path) {
     return this._lookup(path, this._root);
 };
 
-module.exports = Router;
+/**
+ * Reports the number of nodes created by the router. Note that
+ * this is the total number of created nodes; if some are deleted,
+ * this number is not decreased.
+ * 
+ * @return {Number} the total number of created nodes
+ */
+Router.prototype.noNodes = function () {
+    return nextNodeId;
+};
+
+module.exports = {
+    Router: Router,
+    URI: URI,
+    Node: Node
+};
+
