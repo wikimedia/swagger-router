@@ -71,7 +71,7 @@ function Node () {
     this.value = null;
     // this node's ID
     this.id = nextNodeId++;
-    
+
     // Internal properties.
     this._map = {};
     this._name = null;
@@ -170,7 +170,7 @@ function URI(uri, params) {
                     pattern: item.pattern
                 });
             } else {
-                this._uri.push(item.concat(''));
+                this._uri.push(item);
             }
         }, this);
     } else if (uri.constructor === String || uri.constructor === Array) {
@@ -213,7 +213,7 @@ URI.prototype.bind = function (params) {
 URI.prototype.toString = function () {
     if (this._str) {
         // there is a cached version of the URI's string
-        return this._str.concat('');
+        return this._str;
     }
     this._str = '';
     this._uri.forEach(function (item) {
@@ -236,7 +236,7 @@ URI.prototype.toString = function () {
             this._str += '/' + item;
         }
     }, this);
-    return this._str.concat('');
+    return this._str;
 };
 
 
@@ -370,7 +370,7 @@ Router.prototype.lookup = function route(path) {
  * Reports the number of nodes created by the router. Note that
  * this is the total number of created nodes; if some are deleted,
  * this number is not decreased.
- * 
+ *
  * @return {Number} the total number of created nodes
  */
 Router.prototype.noNodes = function () {
