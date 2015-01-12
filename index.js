@@ -14,6 +14,7 @@ var nextNodeId = 0;
 
 function normalizePath (path) {
     if (path.split) {
+        // Strip a leading slash & split on remaining slashes
         path = path.replace(/^\//, '').split(/\//);
     } else if(!(Array.isArray(path))) {
         throw new Error("Invalid path: " + path);
@@ -66,11 +67,13 @@ function parsePattern (pattern) {
  *
  * We use a single monomorphic type for the JIT's benefit.
  */
-function Node () {
+function Node (info) {
+    // Exensible info object. Public read-only property.
+    // Typical members:
+    // - spec: the original spec object (for doc purposes)
+    this.info = info || {};
     // The value for a path ending on this node. Public property.
     this.value = null;
-    // this node's ID
-    this.id = nextNodeId++;
 
     // Internal properties.
     this._map = {};
@@ -151,6 +154,14 @@ Node.prototype.keys = function () {
     }
 };
 
+// Shallow clone, allows sharing of subtrees in DAG
+Node.prototype.clone = function () {
+    var c = new Node();
+    c._map = this._map;
+    c._name = this._name;
+    c._wildcard = this._wildcard;
+};
+
 
 /**
  * Represents a URI object which can optionally contain and
@@ -160,21 +171,22 @@ Node.prototype.keys = function () {
  * @param {Object} params the values for variables encountered in the URI path (optional)
  */
 function URI(uri, params) {
+    // Public, read-only property.
+    this.segments = [];
     if (uri.constructor === URI) {
-        this._uri = [];
-        uri._uri.forEach(function (item) {
+        uri.segments.forEach(function (item) {
             if (item.constructor === Object) {
-                this._uri.push({
+                this.segments.push({
                     modifier: item.modifier,
                     name: item.name,
                     pattern: item.pattern
                 });
             } else {
-                this._uri.push(item);
+                this.segments.push(item);
             }
         }, this);
     } else if (uri.constructor === String || uri.constructor === Array) {
-        this._uri = parsePattern(uri);
+        this.segments = parsePattern(uri);
     }
     this._str = null;
     if (params) {
@@ -195,7 +207,7 @@ URI.prototype.bind = function (params) {
     }
     // look only for parameter keys which match
     // variables in the URI
-    this._uri.forEach(function (item) {
+    this.segments.forEach(function (item) {
         if(item && item.constructor === Object && params[item.name]) {
             item.pattern = params[item.name];
             // we have changed a value, so invalidate the string cache
@@ -216,7 +228,7 @@ URI.prototype.toString = function () {
         return this._str;
     }
     this._str = '';
-    this._uri.forEach(function (item) {
+    this.segments.forEach(function (item) {
         if (item.constructor === Object) {
             if (item.pattern) {
                 // there is a known value for this variable,
@@ -243,13 +255,19 @@ URI.prototype.toString = function () {
 /*
  * The main router object
  */
-function Router () {
+function Router (options) {
+    // Options:
+    // - specHandler(spec) -> spec'
+    // - pathHandler(pathSpec) -> pathSpec'
+    this._options = options || {};
     this._root = new Node();
     // Map for sharing of sub-trees corresponding to the same specs, using
     // object identity on the spec fragment. Not yet implemented.
     this._nodes = new Map();
 }
 
+// XXX modules: variant that builds a prefix tree from segments, but pass in a
+// spec instead of a value
 Router.prototype._buildTree = function(segments, value) {
     var node = new Node();
     if (segments.length) {
@@ -262,35 +280,128 @@ Router.prototype._buildTree = function(segments, value) {
     return node;
 };
 
-Router.prototype.addSpec = function addSpec(spec, prefix) {
-    var spec_root, instance_root, params = {};
-    if (!spec || !spec.paths) {
-        throw new Error("No spec or no paths defined in spec!");
+
+Router.prototype.specToTree = function (spec) {
+    var root = new Node(/*{ spec: spec }*/);
+    for (var path in spec.paths) {
+        var segments = parsePattern(path);
+        this._extend(segments, root, spec.paths[path]);
     }
-    // Get the prefix
-    prefix = parsePattern(prefix || []);
-    // do we know this spec already ?
-    if (!this._nodes.has(spec)) {
-        // this is a new spec, so we need to build its tree
-        spec_root = new Node();
-        for (var path in spec.paths) {
-            var segments = parsePattern(path);
-            this._extend(segments, spec_root, spec.paths[path]);
+    return root;
+};
+
+// handle one spec path
+Router.prototype._handleRESTBasePathSpec = function(node, subspec, symbols) {
+    var self = this;
+    var xrb = subspec['x-restbase'];
+    if (xrb) {
+        symbols = symbols || {};
+        // modules
+        if (Array.isArray(xrb.modules)) {
+            // load each module
+            xrb.modules.forEach(function(m) {
+                // Share modules
+                var mObj = self._modules.get(m);
+                if (!mObj) {
+                    mObj = require(/* somepath + */ m.name)(m.options);
+                }
+                for (var symbol in mObj) {
+                    // check for duplicate symbols
+                    if (symbols[symbol]) {
+                        throw new Error("Duplicate symbol " + symbol
+                                + " in module " + m.name);
+                    } else {
+                        symbols[symbol] = mObj[symbol];
+                    }
+                }
+            });
         }
-        // add it to the spec map
-        this._nodes.set(spec, spec_root);
+
+        // interfaces
+        if (Array.isArray(xrb.interfaces)) {
+            xrb.interfaces.forEach(function(subSpec) {
+                return self.handleRESTBaseSpec(node, subSpec, symbols);
+            });
+        }
     }
-    // create the prefix nodes and connect them to the spec sub-tree
-    spec_root = this._nodes.get(spec);
-    this._extend(prefix, this._root, null);
-    instance_root = this._root;
-    for (var idx = 0; idx < prefix.length; idx++) {
-        instance_root = instance_root.get(prefix[idx], params);
+
+    for (var methodName in subspec) {
+        if (methodName === 'x-restbase') {
+            continue;
+        }
+        // Other methods
+        var method = subspec[methodName];
+        var mxrb = method['x-restbase'];
+        if (mxrb) {
+            // check for 'handler' in symbols
+            if (mxrb.handler) {
+                var handler = symbols[mxrb.handler];
+                if (handler) {
+                    node.value.methods[methodName] = handler;
+                }
+            } else if (mxrb.service) {
+                // set up a handler
+                // XXX: share?
+                node.value.methods[methodName] = function (restbase, req) {
+                    // XXX: expand the request with req information!
+                    restbase.request(mxrb.service);
+                };
+            }
+        }
     }
-    instance_root._wildcard = spec_root._wildcard;
-    for (var key in spec_root._map) {
-        instance_root._map[key] = spec_root._map[key];
+};
+
+Router.prototype.handleRESTBaseSpec = function (rootNode, spec, modules) {
+    var self = this;
+    function handlePaths (paths) {
+        // handle paths
+        for (var pathPattern in paths) {
+            var pathSpec = paths[pathPattern];
+            var path = parsePattern(pathPattern);
+            // Expected to return
+            // - rootNode for single-element path
+            // - a subnode for longer paths
+            var branchNode = self._buildPath(rootNode, path.slice(0, path.length - 1));
+            // Check if we can share the path spec
+            var subtree = self._nodes.get(pathSpec);
+            if (!subtree) {
+                // Build a new tree
+                subtree = new Node();
+                subtree.value = {
+                    methods: {}
+                };
+                // Assign the node before building the tree, so that sharing
+                // opportunities with the same spec are discovered while doing so
+                self._nodes.set(pathSpec, subtree);
+                self._handleRESTBasePathSpec(subtree, pathSpec, modules);
+            }
+            // XXX: check for conflicts!
+            branchNode.set(path[path.length - 1], subtree);
+        }
     }
+
+    // TODO: handle global spec settings
+    if (spec['x-restbase-paths']) {
+        handlePaths(spec['x-restbase-paths']);
+        // TODO:
+        // - set up path-based ACLs
+        // - bail out if prefix is not '/{domain}/sys/'
+    }
+
+    if (spec.paths) {
+        handlePaths(spec.paths);
+    }
+
+};
+
+Router.prototype.restBaseSpecToTree = function(spec) {
+    var root = new Node();
+    this.handleRESTBaseSpec(root, spec);
+    return root;
+};
+
+Router.prototype.setTree = function(tree) {
+    this._root = tree;
 };
 
 Router.prototype.delSpec = function delSpec(spec, prefix) {
@@ -309,7 +420,6 @@ Router.prototype.delSpec = function delSpec(spec, prefix) {
 // and inserting new subtrees at the desired location.
 Router.prototype._extend = function route(path, node, value) {
     var params = {};
-    var origNode = node;
     for (var i = 0; i < path.length; i++) {
         var nextNode = node.get(path[i], params);
         if (!nextNode || !nextNode.get) {
@@ -320,7 +430,26 @@ Router.prototype._extend = function route(path, node, value) {
             node = nextNode;
         }
     }
-    node.value = value;
+    if (value !== undefined) {
+        node.value = value;
+    }
+};
+
+// Extend an existing route tree with a new path by walking the existing tree
+// and inserting new subtrees at the desired location.
+Router.prototype._buildPath = function route(node, path) {
+    var params = {};
+    for (var i = 0; i < path.length; i++) {
+        var nextNode = node.get(path[i], params);
+        if (!nextNode || !nextNode.get) {
+            nextNode = new Node();
+            node.set(path[i], nextNode);
+            node = nextNode;
+        } else {
+            node = nextNode;
+        }
+    }
+    return node;
 };
 
 // Lookup worker.
@@ -363,7 +492,15 @@ Router.prototype._lookup = function route(path, node) {
  */
 Router.prototype.lookup = function route(path) {
     path = normalizePath(path);
-    return this._lookup(path, this._root);
+    var res = this._lookup(path, this._root);
+    if (res) {
+        return {
+            params: res.params,
+            value: res.value
+        };
+    } else {
+        return res;
+    }
 };
 
 /**
