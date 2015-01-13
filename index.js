@@ -264,6 +264,9 @@ function Router (options) {
     // Map for sharing of sub-trees corresponding to the same specs, using
     // object identity on the spec fragment. Not yet implemented.
     this._nodes = new Map();
+    // the map of loaded modules
+    // temporarily here, but should be in restbase
+    this._modules = new Map();
 }
 
 // XXX modules: variant that builds a prefix tree from segments, but pass in a
@@ -304,6 +307,7 @@ Router.prototype._handleRESTBasePathSpec = function(node, subspec, symbols) {
                 var mObj = self._modules.get(m);
                 if (!mObj) {
                     mObj = require(/* somepath + */ m.name)(m.options);
+                    self._modules.set(m, mObj);
                 }
                 for (var symbol in mObj) {
                     // check for duplicate symbols
