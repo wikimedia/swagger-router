@@ -32,7 +32,7 @@ function normalizePath (path) {
 function parsePattern (pattern) {
     var bits = normalizePath(pattern);
     // Parse pattern segments and convert them to objects to be consumed by
-    // Node.set().
+    // Node.setChild().
     return bits.map(function(bit) {
         // Support named but fixed values as
         // {domain:en.wikipedia.org}
@@ -73,48 +73,37 @@ function Node (info) {
 
     // Internal properties.
     this._children = {};
-    this._name = null;
-    this._wildcard = null;
+    this._paramName = null;
 }
 
 Node.prototype._keyPrefix = '/';
 Node.prototype._keyPrefixRegExp = /^\//;
 
-Node.prototype.set = function(key, value) {
+Node.prototype.setChild = function(key, child) {
     var self = this;
     if (key.constructor === String) {
-        this._children[this._keyPrefix + key] = value;
+        this._children[this._keyPrefix + key] = child;
     } else if (key.name && key.pattern && key.pattern.constructor === String) {
-        // A named but plain key. Check if the name matches & set it normally.
-        if (this._name && this._name !== key.name) {
-            throw new Error("Captured pattern parameter " + key.name
-                    + " does not match existing name " + this._name);
-        }
-        this._name = key.name;
-        this._children[this._keyPrefix + key.pattern] = value;
+        // A named but plain key.
+        child._paramName = key.name;
+        this._children[this._keyPrefix + key.pattern] = child;
     } else {
         // Setting up a wildcard match
-        // Check if there are already other non-empty keys
-        var longKeys = Object.keys(this._children).filter(function(key) {
-            return key.length > self._keyPrefix.length;
-        });
-        if (longKeys.length) {
-            throw new Error("Can't register \"" + key + "\" in a wildcard path segment!");
-        } else {
-            this._name = key.name;
-            // Could handle a modifier or regexp here as well
-            this._wildcard = value;
-        }
+        child._paramName = key.name;
+        this._children.wildcard = child;
     }
 };
 
-Node.prototype.get = function(segment, params) {
+Node.prototype.getChild = function(segment, params) {
     if (segment.constructor === String) {
         // Fast path
         if (segment !== '') {
-            var res = this._children[this._keyPrefix + segment] || this._wildcard;
-            if (this._name && res) {
-                params[this._name] = segment;
+            var res = this._children[this._keyPrefix + segment]
+                // Fall back to the wildcard match
+                || this._children.wildcard
+                || null;
+            if (res && res._paramName) {
+                params[res._paramName] = segment;
             }
             return res;
         } else {
@@ -126,20 +115,21 @@ Node.prototype.get = function(segment, params) {
     // are never used for actual routing.
     } else if (segment.pattern) {
         // Unwrap the pattern
-        return this.get(segment.pattern, params);
-    } else if (segment.name === this._name) {
+        return this.getChild(segment.pattern, params);
+    } else if (this._children.wildcard
+            && this._children.wildcard._paramName === segment.name) {
         // XXX: also compare modifier!
-        return this._wildcard;
+        return this._children.wildcard || null;
     }
 };
 
 Node.prototype.hasChildren = function () {
-    return Object.keys(this._children).length || this._wildcard;
+    return Object.keys(this._children).length || this._children.wildcard;
 };
 
 Node.prototype.keys = function () {
     var self = this;
-    if (this._wildcard) {
+    if (this._children.wildcard) {
         return [];
     } else {
         var res = [];
@@ -158,8 +148,6 @@ Node.prototype.keys = function () {
 Node.prototype.clone = function () {
     var c = new Node();
     c._children = this._children;
-    c._name = this._name;
-    c._wildcard = this._wildcard;
 };
 
 
@@ -270,7 +258,7 @@ Router.prototype._buildTree = function(segments, value) {
     if (segments.length) {
         var segment = segments[0];
         var subTree = this._buildTree(segments.slice(1), value);
-        node.set(segment, subTree);
+        node.setChild(segment, subTree);
     } else {
         node.value = value;
     }
@@ -308,10 +296,10 @@ Router.prototype.delSpec = function delSpec(spec, prefix) {
 Router.prototype._extend = function route(path, node, value) {
     var params = {};
     for (var i = 0; i < path.length; i++) {
-        var nextNode = node.get(path[i], params);
-        if (!nextNode || !nextNode.get) {
+        var nextNode = node.getChild(path[i], params);
+        if (!nextNode || !nextNode.getChild) {
             // Found our extension point
-            node.set(path[i], this._buildTree(path.slice(i+1), value));
+            node.setChild(path[i], this._buildTree(path.slice(i+1), value));
             return;
         } else {
             node = nextNode;
@@ -327,10 +315,10 @@ Router.prototype._extend = function route(path, node, value) {
 Router.prototype._buildPath = function route(node, path) {
     var params = {};
     for (var i = 0; i < path.length; i++) {
-        var nextNode = node.get(path[i], params);
-        if (!nextNode || !nextNode.get) {
+        var nextNode = node.getChild(path[i], params);
+        if (!nextNode || !nextNode.getChild) {
             nextNode = new Node();
-            node.set(path[i], nextNode);
+            node.setChild(path[i], nextNode);
             node = nextNode;
         } else {
             node = nextNode;
@@ -344,11 +332,11 @@ Router.prototype._lookup = function route(path, node) {
     var params = {};
     var prevNode;
     for (var i = 0; i < path.length; i++) {
-        if (!node || !node.get) {
+        if (!node || !node.getChild) {
             return null;
         }
         prevNode = node;
-        node = node.get(path[i], params);
+        node = node.getChild(path[i], params);
     }
     if (node && node.value) {
         if (path[path.length - 1] === '') {
