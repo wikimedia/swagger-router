@@ -72,7 +72,7 @@ function Node (info) {
     this.value = null;
 
     // Internal properties.
-    this._map = {};
+    this._children = {};
     this._name = null;
     this._wildcard = null;
 }
@@ -83,7 +83,7 @@ Node.prototype._keyPrefixRegExp = /^\//;
 Node.prototype.set = function(key, value) {
     var self = this;
     if (key.constructor === String) {
-        this._map[this._keyPrefix + key] = value;
+        this._children[this._keyPrefix + key] = value;
     } else if (key.name && key.pattern && key.pattern.constructor === String) {
         // A named but plain key. Check if the name matches & set it normally.
         if (this._name && this._name !== key.name) {
@@ -91,11 +91,11 @@ Node.prototype.set = function(key, value) {
                     + " does not match existing name " + this._name);
         }
         this._name = key.name;
-        this._map[this._keyPrefix + key.pattern] = value;
+        this._children[this._keyPrefix + key.pattern] = value;
     } else {
         // Setting up a wildcard match
         // Check if there are already other non-empty keys
-        var longKeys = Object.keys(this._map).filter(function(key) {
+        var longKeys = Object.keys(this._children).filter(function(key) {
             return key.length > self._keyPrefix.length;
         });
         if (longKeys.length) {
@@ -112,14 +112,14 @@ Node.prototype.get = function(segment, params) {
     if (segment.constructor === String) {
         // Fast path
         if (segment !== '') {
-            var res = this._map[this._keyPrefix + segment] || this._wildcard;
+            var res = this._children[this._keyPrefix + segment] || this._wildcard;
             if (this._name && res) {
                 params[this._name] = segment;
             }
             return res;
         } else {
             // Don't match the wildcard with an empty segment.
-            return this._map[this._keyPrefix + segment];
+            return this._children[this._keyPrefix + segment];
         }
 
     // Fall-back cases for internal use during tree construction. These cases
@@ -134,7 +134,7 @@ Node.prototype.get = function(segment, params) {
 };
 
 Node.prototype.hasChildren = function () {
-    return Object.keys(this._map).length || this._wildcard;
+    return Object.keys(this._children).length || this._wildcard;
 };
 
 Node.prototype.keys = function () {
@@ -143,10 +143,10 @@ Node.prototype.keys = function () {
         return [];
     } else {
         var res = [];
-        Object.keys(this._map).forEach(function(key) {
+        Object.keys(this._children).forEach(function(key) {
             // Only list '' if there are children (for paths like
             // /double//slash)
-            if (key !== self._keyPrefix || self._map[key].hasChildren()) {
+            if (key !== self._keyPrefix || self._children[key].hasChildren()) {
                 res.push(key.replace(self._keyPrefixRegExp, ''));
             }
         });
@@ -157,7 +157,7 @@ Node.prototype.keys = function () {
 // Shallow clone, allows sharing of subtrees in DAG
 Node.prototype.clone = function () {
     var c = new Node();
-    c._map = this._map;
+    c._children = this._children;
     c._name = this._name;
     c._wildcard = this._wildcard;
 };
