@@ -1,11 +1,5 @@
 "use strict";
 
-// For Map. Not used in the fast path.
-require("es6-shim");
-
-var yaml = require('js-yaml');
-var fs = require('fs');
-
 /***
  * :SECTION 1:
  * Private module variables and methods
@@ -83,9 +77,13 @@ function Node (info) {
     this._wildcard = null;
 }
 
+Node.prototype._keyPrefix = 'k_';
+Node.prototype._keyPrefixRegExp = /^k_/;
+
 Node.prototype.set = function(key, value) {
+    var self = this;
     if (key.constructor === String) {
-        this._map['k' + key] = value;
+        this._map[this._keyPrefix + key] = value;
     } else if (key.name && key.pattern && key.pattern.constructor === String) {
         // A named but plain key. Check if the name matches & set it normally.
         if (this._name && this._name !== key.name) {
@@ -93,12 +91,12 @@ Node.prototype.set = function(key, value) {
                     + " does not match existing name " + this._name);
         }
         this._name = key.name;
-        this._map['k' + key.pattern] = value;
+        this._map[this._keyPrefix + key.pattern] = value;
     } else {
         // Setting up a wildcard match
         // Check if there are already other non-empty keys
         var longKeys = Object.keys(this._map).filter(function(key) {
-            return key.length > 1;
+            return key.length > self._keyPrefix.length;
         });
         if (longKeys.length) {
             throw new Error("Can't register \"" + key + "\" in a wildcard path segment!");
@@ -114,14 +112,14 @@ Node.prototype.get = function(segment, params) {
     if (segment.constructor === String) {
         // Fast path
         if (segment !== '') {
-            var res = this._map['k' + segment] || this._wildcard;
+            var res = this._map[this._keyPrefix + segment] || this._wildcard;
             if (this._name && res) {
                 params[this._name] = segment;
             }
             return res;
         } else {
             // Don't match the wildcard with an empty segment.
-            return this._map['k' + segment];
+            return this._map[this._keyPrefix + segment];
         }
 
     // Fall-back cases for internal use during tree construction. These cases
@@ -148,8 +146,8 @@ Node.prototype.keys = function () {
         Object.keys(this._map).forEach(function(key) {
             // Only list '' if there are children (for paths like
             // /double//slash)
-            if (key !== 'k' || self._map[key].hasChildren()) {
-                res.push(key.replace(/^k/, ''));
+            if (key !== self._keyPrefix || self._map[key].hasChildren()) {
+                res.push(key.replace(self._keyPrefixRegExp, ''));
             }
         });
         return res.sort();
@@ -263,12 +261,6 @@ function Router (options) {
     // - pathHandler(pathSpec) -> pathSpec'
     this._options = options || {};
     this._root = new Node();
-    // Map for sharing of sub-trees corresponding to the same specs, using
-    // object identity on the spec fragment. Not yet implemented.
-    this._nodes = new Map();
-    // the map of loaded modules
-    // temporarily here, but should be in restbase
-    this._modules = new Map();
 }
 
 // XXX modules: variant that builds a prefix tree from segments, but pass in a
@@ -292,119 +284,6 @@ Router.prototype.specToTree = function (spec) {
         var segments = parsePattern(path);
         this._extend(segments, root, spec.paths[path]);
     }
-    return root;
-};
-
-// handle one spec path
-Router.prototype._handleRESTBasePathSpec = function(node, subspec, symbols) {
-    var self = this;
-    var xrb = subspec['x-restbase'];
-    if (xrb) {
-        symbols = symbols || {};
-        // modules
-        if (Array.isArray(xrb.modules)) {
-            // load each module
-            xrb.modules.forEach(function(m) {
-                // Share modules
-                var mObj = self._modules.get(m);
-                if (!mObj) {
-                    // TODO: Work this out in restbase !
-                    ///mObj = require(/* somepath + */ m.name)(m.options);
-                    mObj = {};
-                    self._modules.set(m, mObj);
-                }
-                for (var symbol in mObj) {
-                    // check for duplicate symbols
-                    if (symbols[symbol]) {
-                        throw new Error("Duplicate symbol " + symbol
-                                + " in module " + m.name);
-                    } else {
-                        symbols[symbol] = mObj[symbol];
-                    }
-                }
-            });
-        }
-
-        // interfaces
-        if (Array.isArray(xrb.interfaces)) {
-            xrb.interfaces.forEach(function(subSpec) {
-                return self.handleRESTBaseSpec(node, subSpec, symbols);
-            });
-        }
-    }
-
-    for (var methodName in subspec) {
-        if (methodName === 'x-restbase') {
-            continue;
-        }
-        // Other methods
-        var method = subspec[methodName];
-        var mxrb = method['x-restbase'];
-        if (mxrb) {
-            // check for 'handler' in symbols
-            if (mxrb.handler) {
-                var handler = symbols[mxrb.handler];
-                if (handler) {
-                    node.value.methods[methodName] = handler;
-                }
-            } else if (mxrb.service) {
-                // set up a handler
-                // XXX: share?
-                node.value.methods[methodName] = function (restbase, req) {
-                    // XXX: expand the request with req information!
-                    restbase.request(mxrb.service);
-                };
-            }
-        }
-    }
-};
-
-Router.prototype.handleRESTBaseSpec = function (rootNode, spec, modules) {
-    var self = this;
-    function handlePaths (paths) {
-        // handle paths
-        for (var pathPattern in paths) {
-            var pathSpec = paths[pathPattern];
-            var path = parsePattern(pathPattern);
-            // Expected to return
-            // - rootNode for single-element path
-            // - a subnode for longer paths
-            var branchNode = self._buildPath(rootNode, path.slice(0, path.length - 1));
-            // Check if we can share the path spec
-            var subtree = self._nodes.get(pathSpec);
-            if (!subtree) {
-                // Build a new tree
-                subtree = new Node();
-                subtree.value = {
-                    methods: {}
-                };
-                // Assign the node before building the tree, so that sharing
-                // opportunities with the same spec are discovered while doing so
-                self._nodes.set(pathSpec, subtree);
-                self._handleRESTBasePathSpec(subtree, pathSpec, modules);
-            }
-            // XXX: check for conflicts!
-            branchNode.set(path[path.length - 1], subtree);
-        }
-    }
-
-    // TODO: handle global spec settings
-    if (spec['x-restbase-paths']) {
-        handlePaths(spec['x-restbase-paths']);
-        // TODO:
-        // - set up path-based ACLs
-        // - bail out if prefix is not '/{domain}/sys/'
-    }
-
-    if (spec.paths) {
-        handlePaths(spec.paths);
-    }
-
-};
-
-Router.prototype.restBaseSpecToTree = function(spec) {
-    var root = new Node();
-    this.handleRESTBaseSpec(root, spec);
     return root;
 };
 
@@ -521,54 +400,6 @@ Router.prototype.lookup = function route(path) {
 Router.prototype.noNodes = function () {
     return nextNodeId;
 };
-
-Router.prototype.loadFullConf = function (confFile) {
-    var self = this;
-    var conf = null;
-    // try to load the conf
-    try {
-        conf = yaml.safeLoad(fs.readFileSync(confFile));
-    } catch (e) {
-        console.log('Could not load %s: %s', confFile, e);
-        return null;
-    };
-    // go through the conf and recursively load any interface files
-    var heap = [conf];
-    while (heap.length) {
-        var obj = heap.pop();
-        if (Array.isArray(obj)) {
-            heap = heap.concat(obj);
-            continue;
-        } else if (obj && obj.constructor !== Object) {
-            continue;
-        }
-        Object.keys(obj).forEach( function (key) {
-            if (key === 'interfaces') {
-                var ifaces = obj.interfaces;
-                // check that we have an array and that it contains
-                // strings, which we suppose to be YAML file names
-                if (Array.isArray(ifaces)) {
-                    for (var idx = 0; idx < ifaces.length; idx++) {
-                        if (typeof ifaces[idx] === 'string') {
-                            if (ifaces[idx].search(/\.yaml$/) == -1) {
-                                ifaces[idx] += '.yaml';
-                            }
-                            ifaces[idx] = self.loadFullConf('interfaces/' + ifaces[idx]);
-                        }
-                        if (ifaces[idx] && ifaces[idx].constructor === Object) {
-                            heap.push(ifaces[idx]);
-                        }
-                    }
-                } else if (ifaces && ifaces.constructor === Object) {
-                    heap.push(ifaces);
-                }
-            } else if (obj[key] && obj[key].constructor === Object) {
-                heap.push(obj[key]);
-            }
-        });
-    }
-    return conf;
-}
 
 
 module.exports = {
