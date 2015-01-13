@@ -1,9 +1,5 @@
 "use strict";
 
-// For Map. Not used in the fast path.
-require("es6-shim");
-
-
 /***
  * :SECTION 1:
  * Private module variables and methods
@@ -14,6 +10,7 @@ var nextNodeId = 0;
 
 function normalizePath (path) {
     if (path.split) {
+        // Strip a leading slash & split on remaining slashes
         path = path.replace(/^\//, '').split(/\//);
     } else if(!(Array.isArray(path))) {
         throw new Error("Invalid path: " + path);
@@ -66,11 +63,13 @@ function parsePattern (pattern) {
  *
  * We use a single monomorphic type for the JIT's benefit.
  */
-function Node () {
+function Node (info) {
+    // Exensible info object. Public read-only property.
+    // Typical members:
+    // - spec: the original spec object (for doc purposes)
+    this.info = info || {};
     // The value for a path ending on this node. Public property.
     this.value = null;
-    // this node's ID
-    this.id = nextNodeId++;
 
     // Internal properties.
     this._map = {};
@@ -78,9 +77,13 @@ function Node () {
     this._wildcard = null;
 }
 
+Node.prototype._keyPrefix = 'k_';
+Node.prototype._keyPrefixRegExp = /^k_/;
+
 Node.prototype.set = function(key, value) {
+    var self = this;
     if (key.constructor === String) {
-        this._map['k' + key] = value;
+        this._map[this._keyPrefix + key] = value;
     } else if (key.name && key.pattern && key.pattern.constructor === String) {
         // A named but plain key. Check if the name matches & set it normally.
         if (this._name && this._name !== key.name) {
@@ -88,12 +91,12 @@ Node.prototype.set = function(key, value) {
                     + " does not match existing name " + this._name);
         }
         this._name = key.name;
-        this._map['k' + key.pattern] = value;
+        this._map[this._keyPrefix + key.pattern] = value;
     } else {
         // Setting up a wildcard match
         // Check if there are already other non-empty keys
         var longKeys = Object.keys(this._map).filter(function(key) {
-            return key.length > 1;
+            return key.length > self._keyPrefix.length;
         });
         if (longKeys.length) {
             throw new Error("Can't register \"" + key + "\" in a wildcard path segment!");
@@ -109,14 +112,14 @@ Node.prototype.get = function(segment, params) {
     if (segment.constructor === String) {
         // Fast path
         if (segment !== '') {
-            var res = this._map['k' + segment] || this._wildcard;
+            var res = this._map[this._keyPrefix + segment] || this._wildcard;
             if (this._name && res) {
                 params[this._name] = segment;
             }
             return res;
         } else {
             // Don't match the wildcard with an empty segment.
-            return this._map['k' + segment];
+            return this._map[this._keyPrefix + segment];
         }
 
     // Fall-back cases for internal use during tree construction. These cases
@@ -143,12 +146,20 @@ Node.prototype.keys = function () {
         Object.keys(this._map).forEach(function(key) {
             // Only list '' if there are children (for paths like
             // /double//slash)
-            if (key !== 'k' || self._map[key].hasChildren()) {
-                res.push(key.replace(/^k/, ''));
+            if (key !== self._keyPrefix || self._map[key].hasChildren()) {
+                res.push(key.replace(self._keyPrefixRegExp, ''));
             }
         });
         return res.sort();
     }
+};
+
+// Shallow clone, allows sharing of subtrees in DAG
+Node.prototype.clone = function () {
+    var c = new Node();
+    c._map = this._map;
+    c._name = this._name;
+    c._wildcard = this._wildcard;
 };
 
 
@@ -160,21 +171,22 @@ Node.prototype.keys = function () {
  * @param {Object} params the values for variables encountered in the URI path (optional)
  */
 function URI(uri, params) {
+    // Public, read-only property.
+    this.segments = [];
     if (uri.constructor === URI) {
-        this._uri = [];
-        uri._uri.forEach(function (item) {
+        uri.segments.forEach(function (item) {
             if (item.constructor === Object) {
-                this._uri.push({
+                this.segments.push({
                     modifier: item.modifier,
                     name: item.name,
                     pattern: item.pattern
                 });
             } else {
-                this._uri.push(item);
+                this.segments.push(item);
             }
         }, this);
     } else if (uri.constructor === String || uri.constructor === Array) {
-        this._uri = parsePattern(uri);
+        this.segments = parsePattern(uri);
     }
     this._str = null;
     if (params) {
@@ -195,7 +207,7 @@ URI.prototype.bind = function (params) {
     }
     // look only for parameter keys which match
     // variables in the URI
-    this._uri.forEach(function (item) {
+    this.segments.forEach(function (item) {
         if(item && item.constructor === Object && params[item.name]) {
             item.pattern = params[item.name];
             // we have changed a value, so invalidate the string cache
@@ -216,7 +228,7 @@ URI.prototype.toString = function () {
         return this._str;
     }
     this._str = '';
-    this._uri.forEach(function (item) {
+    this.segments.forEach(function (item) {
         if (item.constructor === Object) {
             if (item.pattern) {
                 // there is a known value for this variable,
@@ -243,13 +255,16 @@ URI.prototype.toString = function () {
 /*
  * The main router object
  */
-function Router () {
+function Router (options) {
+    // Options:
+    // - specHandler(spec) -> spec'
+    // - pathHandler(pathSpec) -> pathSpec'
+    this._options = options || {};
     this._root = new Node();
-    // Map for sharing of sub-trees corresponding to the same specs, using
-    // object identity on the spec fragment. Not yet implemented.
-    this._nodes = new Map();
 }
 
+// XXX modules: variant that builds a prefix tree from segments, but pass in a
+// spec instead of a value
 Router.prototype._buildTree = function(segments, value) {
     var node = new Node();
     if (segments.length) {
@@ -262,35 +277,18 @@ Router.prototype._buildTree = function(segments, value) {
     return node;
 };
 
-Router.prototype.addSpec = function addSpec(spec, prefix) {
-    var spec_root, instance_root, params = {};
-    if (!spec || !spec.paths) {
-        throw new Error("No spec or no paths defined in spec!");
+
+Router.prototype.specToTree = function (spec) {
+    var root = new Node(/*{ spec: spec }*/);
+    for (var path in spec.paths) {
+        var segments = parsePattern(path);
+        this._extend(segments, root, spec.paths[path]);
     }
-    // Get the prefix
-    prefix = parsePattern(prefix || []);
-    // do we know this spec already ?
-    if (!this._nodes.has(spec)) {
-        // this is a new spec, so we need to build its tree
-        spec_root = new Node();
-        for (var path in spec.paths) {
-            var segments = parsePattern(path);
-            this._extend(segments, spec_root, spec.paths[path]);
-        }
-        // add it to the spec map
-        this._nodes.set(spec, spec_root);
-    }
-    // create the prefix nodes and connect them to the spec sub-tree
-    spec_root = this._nodes.get(spec);
-    this._extend(prefix, this._root, null);
-    instance_root = this._root;
-    for (var idx = 0; idx < prefix.length; idx++) {
-        instance_root = instance_root.get(prefix[idx], params);
-    }
-    instance_root._wildcard = spec_root._wildcard;
-    for (var key in spec_root._map) {
-        instance_root._map[key] = spec_root._map[key];
-    }
+    return root;
+};
+
+Router.prototype.setTree = function(tree) {
+    this._root = tree;
 };
 
 Router.prototype.delSpec = function delSpec(spec, prefix) {
@@ -309,7 +307,6 @@ Router.prototype.delSpec = function delSpec(spec, prefix) {
 // and inserting new subtrees at the desired location.
 Router.prototype._extend = function route(path, node, value) {
     var params = {};
-    var origNode = node;
     for (var i = 0; i < path.length; i++) {
         var nextNode = node.get(path[i], params);
         if (!nextNode || !nextNode.get) {
@@ -320,7 +317,26 @@ Router.prototype._extend = function route(path, node, value) {
             node = nextNode;
         }
     }
-    node.value = value;
+    if (value !== undefined) {
+        node.value = value;
+    }
+};
+
+// Extend an existing route tree with a new path by walking the existing tree
+// and inserting new subtrees at the desired location.
+Router.prototype._buildPath = function route(node, path) {
+    var params = {};
+    for (var i = 0; i < path.length; i++) {
+        var nextNode = node.get(path[i], params);
+        if (!nextNode || !nextNode.get) {
+            nextNode = new Node();
+            node.set(path[i], nextNode);
+            node = nextNode;
+        } else {
+            node = nextNode;
+        }
+    }
+    return node;
 };
 
 // Lookup worker.
@@ -363,7 +379,15 @@ Router.prototype._lookup = function route(path, node) {
  */
 Router.prototype.lookup = function route(path) {
     path = normalizePath(path);
-    return this._lookup(path, this._root);
+    var res = this._lookup(path, this._root);
+    if (res) {
+        return {
+            params: res.params,
+            value: res.value
+        };
+    } else {
+        return res;
+    }
 };
 
 /**
@@ -376,6 +400,7 @@ Router.prototype.lookup = function route(path) {
 Router.prototype.noNodes = function () {
     return nextNodeId;
 };
+
 
 module.exports = {
     Router: Router,

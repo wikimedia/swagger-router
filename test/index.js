@@ -123,14 +123,33 @@ var expectations = {
     '/en.wikipedia.org/v1//': null
 };
 
-var domains = ['en.wikipedia.org','de.wikipedia.org', 'fr.wikipedia.org', 'es.wikipedia.org'];
+
+function makeFullSpec () {
+    var domains = ['en.wikipedia.org', 'de.wikipedia.org', 'fr.wikipedia.org', 'es.wikipedia.org'];
+
+    function addPrefixedPaths(newPaths, prefix, paths) {
+        var newSpec = {};
+        for (var path in paths) {
+            newPaths[prefix + path] = paths[path];
+        }
+    }
+
+    var fullPaths = {};
+    specs.forEach(function(spec) {
+        domains.forEach(function(domain) {
+            addPrefixedPaths(fullPaths, '/{domain:' + domain + '}/v1', spec.paths);
+        });
+    });
+
+    return {
+        paths: fullPaths
+    };
+}
 
 var router = new Router.Router();
-specs.forEach(function(spec) {
-    domains.forEach(function(domain) {
-        router.addSpec(spec, '/{domain:' + domain + '}/v1');
-    });
-});
+var fullSpec = makeFullSpec();
+var tree = router.specToTree(fullSpec);
+router.setTree(tree);
 
 describe('swagger-router', function() {
 
@@ -140,12 +159,5 @@ describe('swagger-router', function() {
             deepEqual(router.lookup(key), val);
         });
     });
-    
-    it('node count', function () {
-        // we should have 24 nodes + 2 for each test domain (domain/v1 prefix)
-        // 24 nodes = 22 path nodes in the test spec + the spec root node + the root node
-        deepEqual(router.noNodes(), 24 + 2 * domains.length);
-    });
-    
 });
 
