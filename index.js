@@ -306,7 +306,9 @@ Router.prototype._handleRESTBasePathSpec = function(node, subspec, symbols) {
                 // Share modules
                 var mObj = self._modules.get(m);
                 if (!mObj) {
-                    mObj = require(/* somepath + */ m.name)(m.options);
+                    // TODO: Work this out in restbase !
+                    ///mObj = require(/* somepath + */ m.name)(m.options);
+                    mObj = {};
                     self._modules.set(m, mObj);
                 }
                 for (var symbol in mObj) {
@@ -517,6 +519,55 @@ Router.prototype.lookup = function route(path) {
 Router.prototype.noNodes = function () {
     return nextNodeId;
 };
+
+Router.prototype.loadFullConf = function (confFile) {
+    var self = this;
+    var conf = null;
+    // try to load the conf
+    try {
+        conf = yaml.safeLoad(fs.readFileSync(confFile));
+    } catch (e) {
+        console.log('Could not load %s: %s', confFile, e);
+        return null;
+    };
+    // go through the conf and recursively load any interface files
+    var heap = [conf];
+    while (heap.length) {
+        var obj = heap.pop();
+        if (Array.isArray(obj)) {
+            heap = heap.concat(obj);
+            continue;
+        } else if (obj && obj.constructor !== Object) {
+            continue;
+        }
+        Object.keys(obj).forEach( function (key) {
+            if (key === 'interfaces') {
+                var ifaces = obj.interfaces;
+                // check that we have an array and that it contains
+                // strings, which we suppose to be YAML file names
+                if (Array.isArray(ifaces)) {
+                    for (var idx = 0; idx < ifaces.length; idx++) {
+                        if (typeof ifaces[idx] === 'string') {
+                            if (ifaces[idx].search(/\.yaml$/) == -1) {
+                                ifaces[idx] += '.yaml';
+                            }
+                            ifaces[idx] = self.loadFullConf('interfaces/' + ifaces[idx]);
+                        }
+                        if (ifaces[idx] && ifaces[idx].constructor === Object) {
+                            heap.push(ifaces[idx]);
+                        }
+                    }
+                } else if (ifaces && ifaces.constructor === Object) {
+                    heap.push(ifaces);
+                }
+            } else if (obj[key] && obj[key].constructor === Object) {
+                heap.push(obj[key]);
+            }
+        });
+    }
+    return conf;
+}
+
 
 module.exports = {
     Router: Router,
