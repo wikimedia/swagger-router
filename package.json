@@ -22,7 +22,8 @@
     "url": "https://github.com/gwicke/swagger-router/issues"
   },
   "dependencies": {
-    "es6-shim": "^0.22.1"
+    "es6-shim": "^0.22.1",
+    "js-yaml": "~3.2.2"
   },
   "devDependencies": {
     "mocha": "x.x.x",
