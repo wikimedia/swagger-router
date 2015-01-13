@@ -3,6 +3,8 @@
 // For Map. Not used in the fast path.
 require("es6-shim");
 
+var yaml = require('js-yaml');
+var fs = require('fs');
 
 /***
  * :SECTION 1:
