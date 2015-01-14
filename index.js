@@ -311,23 +311,6 @@ Router.prototype._extend = function route(path, node, value) {
     }
 };
 
-// Extend an existing route tree with a new path by walking the existing tree
-// and inserting new subtrees at the desired location.
-Router.prototype._buildPath = function route(node, path) {
-    var params = {};
-    for (var i = 0; i < path.length; i++) {
-        var nextNode = node.getChild(path[i], params);
-        if (!nextNode) {
-            nextNode = new Node();
-            node.setChild(path[i], nextNode);
-            node = nextNode;
-        } else {
-            node = nextNode;
-        }
-    }
-    return node;
-};
-
 // Lookup worker.
 Router.prototype._lookup = function route(path, node) {
     var params = {};
