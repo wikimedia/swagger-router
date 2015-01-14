@@ -202,4 +202,18 @@ describe('URI', function() {
         }
     });
 
+    it('decoding / encoding', function() {
+        var uri = new URI('/{domain:some}/a%2Fb/to/100%/%FF', {domain: 'foo/bar'});
+        // Note how the invalid % encoding is fixed up to %25
+        deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25/%25FF');
+    });
+
+    it('construct from array', function() {
+        var uri = new URI(['{domain:some}','a/b', 'to', '100%'], {domain: 'foo/bar'});
+        // Note how the invalid % encoding is fixed up to %25
+        deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25');
+        // Try once more for caching
+        deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25');
+    });
+
 });

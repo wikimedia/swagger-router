@@ -5,9 +5,6 @@
  * Private module variables and methods
  ***/
 
-// a global variable holding the ID the next created node should have
-var nextNodeId = 0;
-
 function normalizePath (path) {
     if (path.split) {
         // Strip a leading slash & split on remaining slashes
@@ -29,6 +26,21 @@ function normalizePath (path) {
     return path;
 }
 
+
+function robustDecodeURIComponent(uri) {
+    if (!/%/.test(uri)) {
+        return uri;
+    } else {
+        return uri.replace(/(%[0-9a-fA-F][0-9a-fA-F])+/g, function(m) {
+            try {
+                return decodeURIComponent( m );
+            } catch ( e ) {
+                return m;
+            }
+        });
+    }
+}
+
 function parsePattern (pattern) {
     var bits = normalizePath(pattern);
     // Parse pattern segments and convert them to objects to be consumed by
@@ -44,10 +56,10 @@ function parsePattern (pattern) {
             return {
                 modifier: m[1],
                 name: m[2],
-                pattern: m[3]
+                pattern: robustDecodeURIComponent(m[3] || '')
             };
         } else {
-            return bit;
+            return robustDecodeURIComponent(bit);
         }
     });
 }
@@ -174,7 +186,7 @@ function URI(uri, params) {
                 this.segments.push(item);
             }
         }, this);
-    } else if (uri.constructor === String || uri.constructor === Array) {
+    } else if (uri.constructor === String || Array.isArray(uri)) {
         this.segments = parsePattern(uri);
     }
     this._str = null;
@@ -192,7 +204,7 @@ function URI(uri, params) {
 URI.prototype.bind = function (params) {
     if (!params || params.constructor !== Object) {
         // wrong params format
-        return this;
+        throw new Error('Expected URI parameter object, got ' + params);
     }
     // look only for parameter keys which match
     // variables in the URI
@@ -231,10 +243,10 @@ URI.prototype.toString = function () {
             } else {
                 // we have a variable component, but no value,
                 // so let's just return the variable name
-                this._str += '/{' + item.name + '}';
+                this._str += '/{' + encodeURIComponent(item.name) + '}';
             }
         } else {
-            this._str += '/' + item;
+            this._str += '/' + encodeURIComponent(item);
         }
     }, this);
     return this._str;
@@ -361,18 +373,6 @@ Router.prototype.lookup = function route(path) {
         return res;
     }
 };
-
-/**
- * Reports the number of nodes created by the router. Note that
- * this is the total number of created nodes; if some are deleted,
- * this number is not decreased.
- *
- * @return {Number} the total number of created nodes
- */
-Router.prototype.noNodes = function () {
-    return nextNodeId;
-};
-
 
 module.exports = {
     Router: Router,
