@@ -148,6 +148,7 @@ Node.prototype.keys = function () {
 Node.prototype.clone = function () {
     var c = new Node();
     c._children = this._children;
+    return c;
 };
 
 
@@ -316,7 +317,7 @@ Router.prototype._buildPath = function route(node, path) {
     var params = {};
     for (var i = 0; i < path.length; i++) {
         var nextNode = node.getChild(path[i], params);
-        if (!nextNode || !nextNode.getChild) {
+        if (!nextNode) {
             nextNode = new Node();
             node.setChild(path[i], nextNode);
             node = nextNode;
