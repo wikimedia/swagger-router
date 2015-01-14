@@ -216,4 +216,21 @@ describe('URI', function() {
         deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25');
     });
 
+    it('append a suffix path', function() {
+        var uri = new URI('/{domain:test.com}/v1');
+        uri.pushSuffix('/page/{title}');
+        uri.bind({title: 'foo'});
+        deepEqual(uri.toString(), '/test.com/v1/page/foo');
+    });
+
+    it('remove a suffix path', function() {
+        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        uri.popSuffix('/page/{title}');
+        deepEqual(uri.toString(), '/test.com/v1');
+    });
+
+    it('check for a prefix path', function() {
+        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        deepEqual(uri.startsWith('/test.com/v1/page'), true);
+    });
 });
