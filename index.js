@@ -174,7 +174,7 @@ Node.prototype.clone = function () {
 function URI(uri, params) {
     // Public, read-only property.
     this.segments = [];
-    if (uri.constructor === URI) {
+    if (uri && uri.constructor === URI) {
         uri.segments.forEach(function (item) {
             if (item.constructor === Object) {
                 this.segments.push({
@@ -186,7 +186,7 @@ function URI(uri, params) {
                 this.segments.push(item);
             }
         }, this);
-    } else if (uri.constructor === String || Array.isArray(uri)) {
+    } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
         this.segments = parsePattern(uri);
     }
     this._str = null;
@@ -215,6 +215,119 @@ URI.prototype.bind = function (params) {
             this._str = null;
         }
     }, this);
+    return this;
+};
+
+/**
+ * Checks if the URI starts with the given path prefix
+ *
+ * @param {String|URI} pathOrURI the prefix path to check for
+ * @return {Boolean} whether this URI starts with the given prefix path
+ */
+URI.prototype.startsWith = function (pathOrURI) {
+    var uri;
+    if (!pathOrURI) {
+        return true;
+    }
+    if (pathOrURI.constructor === URI) {
+        uri = pathOrURI;
+    } else {
+        uri = new URI(pathOrURI);
+    }
+    // if our URI is shorter than the one we are
+    // comparing to, it doesn't start with that prefix
+    if (this.segments.length < uri.segments.length) {
+        return false;
+    }
+    // check each component
+    for (var idx = 0; idx < uri.segments.length; idx++) {
+        var mySeg = this.segments[idx];
+        var otherSeg = uri.segments[idx];
+        if (mySeg.constructor === Object && otherSeg.constructor === Object) {
+            // both segments are named variables
+            // nothing to do
+            continue;
+        } else if (mySeg.constructor === Object) {
+            // we have a named variable, but there is a string
+            // given in the prefix
+            if (mySeg.pattern && mySeg.pattern !== otherSeg) {
+                // they differ
+                return false;
+            }
+        } else if (otherSeg.constructor === Object) {
+            // we have a fixed string, but a variable has been
+            // given in the prefix - nothing to do
+            continue;
+        } else if (mySeg !== otherSeg) {
+            // both are strings, but they differ
+            return false;
+        }
+    }
+    // ok, no differences found
+    return true;
+};
+
+/**
+ * Appends the specified suffix to this URI object
+ *
+ * @param {String|URI} pathOrURI the suffix to append
+ * @return {URI} this URI object
+ */
+URI.prototype.pushSuffix = function (pathOrURI) {
+    var suffix;
+    if (!pathOrURI) {
+        return this;
+    }
+    if (pathOrURI.constructor === URI) {
+        suffix = pathOrURI.segments;
+    } else {
+        suffix = parsePattern(pathOrURI);
+    }
+    this.segments = this.segments.concat(suffix);
+    this._str = null;
+    return this;
+};
+
+/**
+ * Removes the given suffix from this URI object
+ *
+ * @param {String|URI} pathOrURI the suffix path to remove
+ * @return {URI} this URI object
+ */
+URI.prototype.popSuffix = function (pathOrURI) {
+    var suffix;
+    var mySeg = this.segments;
+    var currSuffixIdx, currMyIdx;
+    if (!pathOrURI) {
+        return this;
+    }
+    // get the suffix to remove
+    if (pathOrURI.constructor === URI) {
+        suffix = pathOrURI.segments;
+    } else {
+        suffix = parsePattern(pathOrURI);
+    }
+    // check the compatibility of each segment
+    currSuffixIdx = suffix.length - 1;
+    currMyIdx = mySeg.length - 1;
+    while (currMyIdx >= 0 && currSuffixIdx >= 0) {
+        var myCurr = mySeg[currMyIdx];
+        var suffCurr = suffix[currSuffixIdx];
+        var remove = true;
+        if (myCurr.constructor !== Object && suffCurr.constructor !== Object) {
+            if (myCurr !== suffCurr) {
+                remove = false;
+            }
+        }
+        if (!remove) {
+            break;
+        }
+        // ok, pop the segment
+        mySeg.pop();
+        this._str = null;
+        currMyIdx--;
+        currSuffixIdx--;
+    }
     return this;
 };
 
