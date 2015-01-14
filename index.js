@@ -1,19 +1,13 @@
 "use strict";
 
-// For Map. Not used in the fast path.
-require("es6-shim");
-
-
 /***
  * :SECTION 1:
  * Private module variables and methods
  ***/
 
-// a global variable holding the ID the next created node should have
-var nextNodeId = 0;
-
 function normalizePath (path) {
     if (path.split) {
+        // Strip a leading slash & split on remaining slashes
         path = path.replace(/^\//, '').split(/\//);
     } else if(!(Array.isArray(path))) {
         throw new Error("Invalid path: " + path);
@@ -32,10 +26,25 @@ function normalizePath (path) {
     return path;
 }
 
+
+function robustDecodeURIComponent(uri) {
+    if (!/%/.test(uri)) {
+        return uri;
+    } else {
+        return uri.replace(/(%[0-9a-fA-F][0-9a-fA-F])+/g, function(m) {
+            try {
+                return decodeURIComponent( m );
+            } catch ( e ) {
+                return m;
+            }
+        });
+    }
+}
+
 function parsePattern (pattern) {
     var bits = normalizePath(pattern);
     // Parse pattern segments and convert them to objects to be consumed by
-    // Node.set().
+    // Node.setChild().
     return bits.map(function(bit) {
         // Support named but fixed values as
         // {domain:en.wikipedia.org}
@@ -47,10 +56,10 @@ function parsePattern (pattern) {
             return {
                 modifier: m[1],
                 name: m[2],
-                pattern: m[3]
+                pattern: robustDecodeURIComponent(m[3] || '')
             };
         } else {
-            return bit;
+            return robustDecodeURIComponent(bit);
         }
     });
 }
@@ -66,89 +75,92 @@ function parsePattern (pattern) {
  *
  * We use a single monomorphic type for the JIT's benefit.
  */
-function Node () {
+function Node (info) {
+    // Exensible info object. Public read-only property.
+    // Typical members:
+    // - spec: the original spec object (for doc purposes)
+    this.info = info || {};
     // The value for a path ending on this node. Public property.
     this.value = null;
-    // this node's ID
-    this.id = nextNodeId++;
 
     // Internal properties.
-    this._map = {};
-    this._name = null;
-    this._wildcard = null;
+    this._children = {};
+    this._paramName = null;
 }
 
-Node.prototype.set = function(key, value) {
+Node.prototype._keyPrefix = '/';
+Node.prototype._keyPrefixRegExp = /^\//;
+
+Node.prototype.setChild = function(key, child) {
+    var self = this;
     if (key.constructor === String) {
-        this._map['k' + key] = value;
+        this._children[this._keyPrefix + key] = child;
     } else if (key.name && key.pattern && key.pattern.constructor === String) {
-        // A named but plain key. Check if the name matches & set it normally.
-        if (this._name && this._name !== key.name) {
-            throw new Error("Captured pattern parameter " + key.name
-                    + " does not match existing name " + this._name);
-        }
-        this._name = key.name;
-        this._map['k' + key.pattern] = value;
+        // A named but plain key.
+        child._paramName = key.name;
+        this._children[this._keyPrefix + key.pattern] = child;
     } else {
         // Setting up a wildcard match
-        // Check if there are already other non-empty keys
-        var longKeys = Object.keys(this._map).filter(function(key) {
-            return key.length > 1;
-        });
-        if (longKeys.length) {
-            throw new Error("Can't register \"" + key + "\" in a wildcard path segment!");
-        } else {
-            this._name = key.name;
-            // Could handle a modifier or regexp here as well
-            this._wildcard = value;
-        }
+        child._paramName = key.name;
+        this._children.wildcard = child;
     }
 };
 
-Node.prototype.get = function(segment, params) {
+Node.prototype.getChild = function(segment, params) {
     if (segment.constructor === String) {
         // Fast path
         if (segment !== '') {
-            var res = this._map['k' + segment] || this._wildcard;
-            if (this._name && res) {
-                params[this._name] = segment;
+            var res = this._children[this._keyPrefix + segment]
+                // Fall back to the wildcard match
+                || this._children.wildcard
+                || null;
+            if (res && res._paramName) {
+                params[res._paramName] = segment;
             }
             return res;
         } else {
             // Don't match the wildcard with an empty segment.
-            return this._map['k' + segment];
+            return this._children[this._keyPrefix + segment];
         }
 
     // Fall-back cases for internal use during tree construction. These cases
     // are never used for actual routing.
     } else if (segment.pattern) {
         // Unwrap the pattern
-        return this.get(segment.pattern, params);
-    } else if (segment.name === this._name) {
+        return this.getChild(segment.pattern, params);
+    } else if (this._children.wildcard
+            && this._children.wildcard._paramName === segment.name) {
         // XXX: also compare modifier!
-        return this._wildcard;
+        return this._children.wildcard || null;
     }
 };
 
 Node.prototype.hasChildren = function () {
-    return Object.keys(this._map).length || this._wildcard;
+    return Object.keys(this._children).length || this._children.wildcard;
 };
 
 Node.prototype.keys = function () {
     var self = this;
-    if (this._wildcard) {
+    if (this._children.wildcard) {
         return [];
     } else {
         var res = [];
-        Object.keys(this._map).forEach(function(key) {
+        Object.keys(this._children).forEach(function(key) {
             // Only list '' if there are children (for paths like
             // /double//slash)
-            if (key !== 'k' || self._map[key].hasChildren()) {
-                res.push(key.replace(/^k/, ''));
+            if (key !== self._keyPrefix || self._children[key].hasChildren()) {
+                res.push(key.replace(self._keyPrefixRegExp, ''));
             }
         });
         return res.sort();
     }
+};
+
+// Shallow clone, allows sharing of subtrees in DAG
+Node.prototype.clone = function () {
+    var c = new Node();
+    c._children = this._children;
+    return c;
 };
 
 
@@ -160,21 +172,22 @@ Node.prototype.keys = function () {
  * @param {Object} params the values for variables encountered in the URI path (optional)
  */
 function URI(uri, params) {
-    if (uri.constructor === URI) {
-        this._uri = [];
-        uri._uri.forEach(function (item) {
+    // Public, read-only property.
+    this.segments = [];
+    if (uri && uri.constructor === URI) {
+        uri.segments.forEach(function (item) {
             if (item.constructor === Object) {
-                this._uri.push({
+                this.segments.push({
                     modifier: item.modifier,
                     name: item.name,
                     pattern: item.pattern
                 });
             } else {
-                this._uri.push(item);
+                this.segments.push(item);
             }
         }, this);
-    } else if (uri.constructor === String || uri.constructor === Array) {
-        this._uri = parsePattern(uri);
+    } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
+        this.segments = parsePattern(uri);
     }
     this._str = null;
     if (params) {
@@ -191,17 +204,130 @@ function URI(uri, params) {
 URI.prototype.bind = function (params) {
     if (!params || params.constructor !== Object) {
         // wrong params format
-        return this;
+        throw new Error('Expected URI parameter object, got ' + params);
     }
     // look only for parameter keys which match
     // variables in the URI
-    this._uri.forEach(function (item) {
+    this.segments.forEach(function (item) {
         if(item && item.constructor === Object && params[item.name]) {
             item.pattern = params[item.name];
             // we have changed a value, so invalidate the string cache
             this._str = null;
         }
     }, this);
+    return this;
+};
+
+/**
+ * Checks if the URI starts with the given path prefix
+ *
+ * @param {String|URI} pathOrURI the prefix path to check for
+ * @return {Boolean} whether this URI starts with the given prefix path
+ */
+URI.prototype.startsWith = function (pathOrURI) {
+    var uri;
+    if (!pathOrURI) {
+        return true;
+    }
+    if (pathOrURI.constructor === URI) {
+        uri = pathOrURI;
+    } else {
+        uri = new URI(pathOrURI);
+    }
+    // if our URI is shorter than the one we are
+    // comparing to, it doesn't start with that prefix
+    if (this.segments.length < uri.segments.length) {
+        return false;
+    }
+    // check each component
+    for (var idx = 0; idx < uri.segments.length; idx++) {
+        var mySeg = this.segments[idx];
+        var otherSeg = uri.segments[idx];
+        if (mySeg.constructor === Object && otherSeg.constructor === Object) {
+            // both segments are named variables
+            // nothing to do
+            continue;
+        } else if (mySeg.constructor === Object) {
+            // we have a named variable, but there is a string
+            // given in the prefix
+            if (mySeg.pattern && mySeg.pattern !== otherSeg) {
+                // they differ
+                return false;
+            }
+        } else if (otherSeg.constructor === Object) {
+            // we have a fixed string, but a variable has been
+            // given in the prefix - nothing to do
+            continue;
+        } else if (mySeg !== otherSeg) {
+            // both are strings, but they differ
+            return false;
+        }
+    }
+    // ok, no differences found
+    return true;
+};
+
+/**
+ * Appends the specified suffix to this URI object
+ *
+ * @param {String|URI} pathOrURI the suffix to append
+ * @return {URI} this URI object
+ */
+URI.prototype.pushSuffix = function (pathOrURI) {
+    var suffix;
+    if (!pathOrURI) {
+        return this;
+    }
+    if (pathOrURI.constructor === URI) {
+        suffix = pathOrURI.segments;
+    } else {
+        suffix = parsePattern(pathOrURI);
+    }
+    this.segments = this.segments.concat(suffix);
+    this._str = null;
+    return this;
+};
+
+/**
+ * Removes the given suffix from this URI object
+ *
+ * @param {String|URI} pathOrURI the suffix path to remove
+ * @return {URI} this URI object
+ */
+URI.prototype.popSuffix = function (pathOrURI) {
+    var suffix;
+    var mySeg = this.segments;
+    var currSuffixIdx, currMyIdx;
+    if (!pathOrURI) {
+        return this;
+    }
+    // get the suffix to remove
+    if (pathOrURI.constructor === URI) {
+        suffix = pathOrURI.segments;
+    } else {
+        suffix = parsePattern(pathOrURI);
+    }
+    // check the compatibility of each segment
+    currSuffixIdx = suffix.length - 1;
+    currMyIdx = mySeg.length - 1;
+    while (currMyIdx >= 0 && currSuffixIdx >= 0) {
+        var myCurr = mySeg[currMyIdx];
+        var suffCurr = suffix[currSuffixIdx];
+        var remove = true;
+        if (myCurr.constructor !== Object && suffCurr.constructor !== Object) {
+            if (myCurr !== suffCurr) {
+                remove = false;
+            }
+        }
+        if (!remove) {
+            break;
+        }
+        // ok, pop the segment
+        mySeg.pop();
+        this._str = null;
+        currMyIdx--;
+        currSuffixIdx--;
+    }
     return this;
 };
 
@@ -216,7 +342,7 @@ URI.prototype.toString = function () {
         return this._str;
     }
     this._str = '';
-    this._uri.forEach(function (item) {
+    this.segments.forEach(function (item) {
         if (item.constructor === Object) {
             if (item.pattern) {
                 // there is a known value for this variable,
@@ -230,10 +356,10 @@ URI.prototype.toString = function () {
             } else {
                 // we have a variable component, but no value,
                 // so let's just return the variable name
-                this._str += '/{' + item.name + '}';
+                this._str += '/{' + encodeURIComponent(item.name) + '}';
             }
         } else {
-            this._str += '/' + item;
+            this._str += '/' + encodeURIComponent(item);
         }
     }, this);
     return this._str;
@@ -243,54 +369,40 @@ URI.prototype.toString = function () {
 /*
  * The main router object
  */
-function Router () {
+function Router (options) {
+    // Options:
+    // - specHandler(spec) -> spec'
+    // - pathHandler(pathSpec) -> pathSpec'
+    this._options = options || {};
     this._root = new Node();
-    // Map for sharing of sub-trees corresponding to the same specs, using
-    // object identity on the spec fragment. Not yet implemented.
-    this._nodes = new Map();
 }
 
+// XXX modules: variant that builds a prefix tree from segments, but pass in a
+// spec instead of a value
 Router.prototype._buildTree = function(segments, value) {
     var node = new Node();
     if (segments.length) {
         var segment = segments[0];
         var subTree = this._buildTree(segments.slice(1), value);
-        node.set(segment, subTree);
+        node.setChild(segment, subTree);
     } else {
         node.value = value;
     }
     return node;
 };
 
-Router.prototype.addSpec = function addSpec(spec, prefix) {
-    var spec_root, instance_root, params = {};
-    if (!spec || !spec.paths) {
-        throw new Error("No spec or no paths defined in spec!");
+
+Router.prototype.specToTree = function (spec) {
+    var root = new Node(/*{ spec: spec }*/);
+    for (var path in spec.paths) {
+        var segments = parsePattern(path);
+        this._extend(segments, root, spec.paths[path]);
     }
-    // Get the prefix
-    prefix = parsePattern(prefix || []);
-    // do we know this spec already ?
-    if (!this._nodes.has(spec)) {
-        // this is a new spec, so we need to build its tree
-        spec_root = new Node();
-        for (var path in spec.paths) {
-            var segments = parsePattern(path);
-            this._extend(segments, spec_root, spec.paths[path]);
-        }
-        // add it to the spec map
-        this._nodes.set(spec, spec_root);
-    }
-    // create the prefix nodes and connect them to the spec sub-tree
-    spec_root = this._nodes.get(spec);
-    this._extend(prefix, this._root, null);
-    instance_root = this._root;
-    for (var idx = 0; idx < prefix.length; idx++) {
-        instance_root = instance_root.get(prefix[idx], params);
-    }
-    instance_root._wildcard = spec_root._wildcard;
-    for (var key in spec_root._map) {
-        instance_root._map[key] = spec_root._map[key];
-    }
+    return root;
+};
+
+Router.prototype.setTree = function(tree) {
+    this._root = tree;
 };
 
 Router.prototype.delSpec = function delSpec(spec, prefix) {
@@ -309,18 +421,19 @@ Router.prototype.delSpec = function delSpec(spec, prefix) {
 // and inserting new subtrees at the desired location.
 Router.prototype._extend = function route(path, node, value) {
     var params = {};
-    var origNode = node;
     for (var i = 0; i < path.length; i++) {
-        var nextNode = node.get(path[i], params);
-        if (!nextNode || !nextNode.get) {
+        var nextNode = node.getChild(path[i], params);
+        if (!nextNode || !nextNode.getChild) {
             // Found our extension point
-            node.set(path[i], this._buildTree(path.slice(i+1), value));
+            node.setChild(path[i], this._buildTree(path.slice(i+1), value));
             return;
         } else {
             node = nextNode;
         }
     }
-    node.value = value;
+    if (value !== undefined) {
+        node.value = value;
+    }
 };
 
 // Lookup worker.
@@ -328,11 +441,11 @@ Router.prototype._lookup = function route(path, node) {
     var params = {};
     var prevNode;
     for (var i = 0; i < path.length; i++) {
-        if (!node || !node.get) {
+        if (!node || !node.getChild) {
             return null;
         }
         prevNode = node;
-        node = node.get(path[i], params);
+        node = node.getChild(path[i], params);
     }
     if (node && node.value) {
         if (path[path.length - 1] === '') {
@@ -363,18 +476,15 @@ Router.prototype._lookup = function route(path, node) {
  */
 Router.prototype.lookup = function route(path) {
     path = normalizePath(path);
-    return this._lookup(path, this._root);
-};
-
-/**
- * Reports the number of nodes created by the router. Note that
- * this is the total number of created nodes; if some are deleted,
- * this number is not decreased.
- *
- * @return {Number} the total number of created nodes
- */
-Router.prototype.noNodes = function () {
-    return nextNodeId;
+    var res = this._lookup(path, this._root);
+    if (res) {
+        return {
+            params: res.params,
+            value: res.value
+        };
+    } else {
+        return res;
+    }
 };
 
 module.exports = {

@@ -6,7 +6,9 @@ require('mocha-jshint')();
 // mocha defines to avoid JSHint breakage
 /* global describe, it, before, beforeEach, after, afterEach */
 var deepEqual = require('assert').deepEqual;
-var Router = require('../index');
+var swaggerRouter = require('../index');
+var Router = swaggerRouter.Router;
+var URI = swaggerRouter.URI;
 
 function listingHandler (list) { return list; }
 
@@ -28,7 +30,8 @@ var specs = [
             '/transform/': '/transform/',
             '/double/': '/double/',
             '/double//': '/double//',
-            '/double//slash': '/double//slash'
+            '/double//slash': '/double//slash',
+            '/some/really/long/path': '/some/really/long/path'
         }
     }
 ];
@@ -115,6 +118,12 @@ var expectations = {
             domain: 'en.wikipedia.org'
         }
     },
+    '/en.wikipedia.org/v1/some/really/long/path': {
+        value: '/some/really/long/path',
+        params: {
+            domain: 'en.wikipedia.org'
+        }
+    },
 
     // A few paths that should not match
     '/en.wikipedia.org/v1/pages': null,
@@ -123,16 +132,35 @@ var expectations = {
     '/en.wikipedia.org/v1//': null
 };
 
-var domains = ['en.wikipedia.org','de.wikipedia.org', 'fr.wikipedia.org', 'es.wikipedia.org'];
 
-var router = new Router.Router();
-specs.forEach(function(spec) {
-    domains.forEach(function(domain) {
-        router.addSpec(spec, '/{domain:' + domain + '}/v1');
+function makeFullSpec () {
+    var domains = ['en.wikipedia.org', 'de.wikipedia.org', 'fr.wikipedia.org', 'es.wikipedia.org'];
+
+    function addPrefixedPaths(newPaths, prefix, paths) {
+        var newSpec = {};
+        for (var path in paths) {
+            newPaths[prefix + path] = paths[path];
+        }
+    }
+
+    var fullPaths = {};
+    specs.forEach(function(spec) {
+        domains.forEach(function(domain) {
+            addPrefixedPaths(fullPaths, '/{domain:' + domain + '}/v1', spec.paths);
+        });
     });
-});
 
-describe('swagger-router', function() {
+    return {
+        paths: fullPaths
+    };
+}
+
+var router = new Router();
+var fullSpec = makeFullSpec();
+var tree = router.specToTree(fullSpec);
+router.setTree(tree);
+
+describe('Set of lookups', function() {
 
     Object.keys(expectations).forEach(function(key) {
         var val = expectations[key];
@@ -140,12 +168,69 @@ describe('swagger-router', function() {
             deepEqual(router.lookup(key), val);
         });
     });
-    
-    it('node count', function () {
-        // we should have 24 nodes + 2 for each test domain (domain/v1 prefix)
-        // 24 nodes = 22 path nodes in the test spec + the spec root node + the root node
-        deepEqual(router.noNodes(), 24 + 2 * domains.length);
-    });
-    
 });
 
+router.setTree(tree.clone());
+describe('Repeat on cloned tree', function() {
+
+    Object.keys(expectations).forEach(function(key) {
+        var val = expectations[key];
+        it('match: ' + JSON.stringify(key), function() {
+            deepEqual(router.lookup(key), val);
+        });
+    });
+});
+
+describe('URI', function() {
+    it('to URI and back', function() {
+        var uri = new URI('/{domain:some}/path/to/something');
+        uri = new URI(uri);
+        uri.bind({domain: 'foo/bar'});
+        deepEqual(uri.toString(), '/foo%2Fbar/path/to/something');
+    });
+
+    it('{/patterns}', function() {
+        try {
+            var uri = new URI('/{domain:some}/path/to{/optionalPath}');
+            uri = new URI(uri);
+            uri.bind({domain: 'foo'});
+            deepEqual(uri.toString(), '/foo/path/to{/optionalPath}');
+        } catch (e) {
+            if (!/Modifiers are not yet implemented/.test(e.message)) {
+                throw e;
+            }
+        }
+    });
+
+    it('decoding / encoding', function() {
+        var uri = new URI('/{domain:some}/a%2Fb/to/100%/%FF', {domain: 'foo/bar'});
+        // Note how the invalid % encoding is fixed up to %25
+        deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25/%25FF');
+    });
+
+    it('construct from array', function() {
+        var uri = new URI(['{domain:some}','a/b', 'to', '100%'], {domain: 'foo/bar'});
+        // Note how the invalid % encoding is fixed up to %25
+        deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25');
+        // Try once more for caching
+        deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25');
+    });
+
+    it('append a suffix path', function() {
+        var uri = new URI('/{domain:test.com}/v1');
+        uri.pushSuffix('/page/{title}');
+        uri.bind({title: 'foo'});
+        deepEqual(uri.toString(), '/test.com/v1/page/foo');
+    });
+
+    it('remove a suffix path', function() {
+        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        uri.popSuffix('/page/{title}');
+        deepEqual(uri.toString(), '/test.com/v1');
+    });
+
+    it('check for a prefix path', function() {
+        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        deepEqual(uri.startsWith('/test.com/v1/page'), true);
+    });
+});
