@@ -99,6 +99,8 @@ function URI(uri, params) {
         }, this);
     } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
         this.path = parsePattern(uri);
+    } else if (uri !== '') {
+        throw new Error('Invalid path passed into URI constructor: ' + uri);
     }
     this._str = null;
     if (params) {
