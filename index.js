@@ -55,9 +55,9 @@ function parsePattern (pattern) {
         // {domain:en.wikipedia.org}
         var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
         if (m) {
-            if (m[1]) {
-                throw new Error("Modifiers are not yet implemented: " + pattern);
-            }
+///            if (m[1]) {
+///                throw new Error("Modifiers are not yet implemented: " + pattern);
+///            }
             return {
                 modifier: m[1],
                 name: m[2],
@@ -259,11 +259,13 @@ URI.prototype.toString = function () {
                 // there is a known value for this variable,
                 // so use it
                 this._str += '/' + encodeURIComponent(item.pattern);
-            } else if (item.modifer) {
+            } else if (item.modifier) {
                 // we are dealing with a modifier, and there
-                // seems to be no value, so simply ignore the
-                // component
-                this._str += '';
+                // seems to be no value, so check the modifier type
+                if (item.modifier === '+') {
+                    // we need to add a slash for a +
+                    this._str += '/';
+                }
             } else {
                 // we have a variable component, but no value,
                 // so let's just return the variable name
