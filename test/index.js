@@ -189,17 +189,29 @@ describe('URI', function() {
         deepEqual(uri.toString(), '/foo%2Fbar/path/to/something');
     });
 
-    it('{/patterns}', function() {
-        try {
-            var uri = new URI('/{domain:some}/path/to{/optionalPath}');
-            uri = new URI(uri);
-            uri.bind({domain: 'foo'});
-            deepEqual(uri.toString(), '/foo/path/to{/optionalPath}');
-        } catch (e) {
-            if (!/Modifiers are not yet implemented/.test(e.message)) {
-                throw e;
-            }
-        }
+    it('{/patterns} empty', function() {
+        var uri = new URI('/{domain:some}/path/to{/optionalPath}');
+        uri = new URI(uri);
+        uri.bind({domain: 'foo'});
+        deepEqual(uri.toString(), '/foo/path/to');
+    });
+
+    it('{/patterns} bound', function() {
+        var uri = new URI('/{domain:some}/path/to{/optionalPath}');
+        uri = new URI(uri);
+        uri.bind({optionalPath: 'foo'});
+        deepEqual(uri.toString(), '/some/path/to/foo');
+    });
+
+    it('{+patterns} empty', function() {
+        var uri = new URI('/{domain:some}/path/to/{+rest}');
+        deepEqual(uri.toString(), '/some/path/to/');
+    });
+
+    it('{+patterns} bound', function() {
+        var uri = new URI('/{domain:some}/path/to/{+rest}');
+        uri.bind({rest: 'foo'});
+        deepEqual(uri.toString(), '/some/path/to/foo');
     });
 
     it('decoding / encoding', function() {
