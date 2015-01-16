@@ -278,7 +278,13 @@ URI.prototype.toString = function () {
     return this._str;
 };
 
+// For JSON.stringify
 URI.prototype.toJSON = URI.prototype.toString;
+// For util.inspect, console.log & co
+URI.prototype.inspect = function () {
+    // Quote the string
+    return JSON.stringify(this.toString());
+};
 
 
 /*
@@ -384,7 +390,11 @@ Node.prototype.visitAsync = function(fn, path) {
     .then(function() {
         return Promise.resolve(Object.keys(self._children))
         .each(function(childKey) {
-            return self._children[childKey].visitAsync(fn, path.concat([childKey]));
+            var segment = childKey.replace(/^\//, '');
+            if (segment === 'wildcard') {
+                segment = '';
+            }
+            return self._children[childKey].visitAsync(fn, path.concat([segment]));
         });
     });
 };
