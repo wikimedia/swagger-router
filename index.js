@@ -83,8 +83,9 @@ function parsePattern (pattern) {
  * @param {Object} params the values for variables encountered in the URI path (optional)
  */
 function URI(uri, params) {
-    // Public, read-only property.
+    // Public, read-only properties
     this.path = [];
+    this.params = {};
     if (uri && uri.constructor === URI) {
         uri.path.forEach(function (item) {
             if (item.constructor === Object) {
@@ -93,12 +94,18 @@ function URI(uri, params) {
                     name: item.name,
                     pattern: item.pattern
                 });
+                this.params[item.name] = item.pattern;
             } else {
                 this.path.push(item);
             }
         }, this);
     } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
         this.path = parsePattern(uri);
+        this.path.forEach(function(item) {
+            if (item.constructor === Object && item.name && item.pattern) {
+                this.params[item.name] = item.pattern;
+            }
+        }, this);
     }
     this._str = null;
     if (params) {
@@ -122,6 +129,7 @@ URI.prototype.bind = function (params) {
     this.path.forEach(function (item) {
         if(item && item.constructor === Object && params[item.name]) {
             item.pattern = params[item.name];
+            this.params[item.name] = item.pattern;
             // we have changed a value, so invalidate the string cache
             this._str = null;
         }
@@ -195,6 +203,11 @@ URI.prototype.pushSuffix = function (pathOrURI) {
         suffix = parsePattern(pathOrURI);
     }
     this.path = this.path.concat(suffix);
+    suffix.forEach(function(item) {
+        if (item.constructor === Object && item.name && item.pattern) {
+            this.params[item.name] = item.pattern;
+        }
+    }, this);
     this._str = null;
     return this;
 };
@@ -234,7 +247,10 @@ URI.prototype.popSuffix = function (pathOrURI) {
             break;
         }
         // ok, pop the segment
-        mySeg.pop();
+        var popped = mySeg.pop();
+        if (popped.constructor === Object && popped.name) {
+            delete this.params[popped.name];
+        }
         this._str = null;
         currMyIdx--;
         currSuffixIdx--;
