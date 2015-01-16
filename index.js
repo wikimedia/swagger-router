@@ -499,6 +499,8 @@ Router.prototype._lookup = function route(path, node) {
 Router.prototype.lookup = function route(path) {
     if (!path || path.constructor !== URI) {
         path = normalizePath(path);
+    } else if (path.constructor === URI) {
+        path = path.path;
     }
     var res = this._lookup(path, this._root);
     if (res) {
