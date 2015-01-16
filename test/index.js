@@ -233,4 +233,25 @@ describe('URI', function() {
         var uri = new URI('/{domain:test.com}/v1/page/{title}');
         deepEqual(uri.startsWith('/test.com/v1/page'), true);
     });
+    
+    it('params', function() {
+        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        uri.bind({title: 'Foo'});
+        deepEqual(uri.params, {domain: 'test.com', title: 'Foo'});
+    });
+    
+    it('params after pushSuffix()', function() {
+        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        uri.pushSuffix(new URI('/{format:html}'));
+        uri.bind({title: 'Foo'});
+        deepEqual(uri.params, {domain: 'test.com', title: 'Foo', format: 'html'});
+    });
+    
+    it('params after popSuffix()', function() {
+        var uri = new URI('/{domain:test.com}/v1/page/{title}/{format:html}');
+        uri.popSuffix('/html');
+        uri.bind({title: 'Foo'});
+        deepEqual(uri.params, {domain: 'test.com', title: 'Foo'});
+    });
+    
 });
