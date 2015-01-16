@@ -1,12 +1,17 @@
 "use strict";
 
+if (!global.Promise || !global.Promise.promisify) {
+    global.Promise = require('bluebird');
+}
+
 /***
  * :SECTION 1:
  * Private module variables and methods
  ***/
 
+
 function normalizePath (path) {
-    if (path.split) {
+    if (path && path.constructor === String) {
         // Strip a leading slash & split on remaining slashes
         path = path.replace(/^\//, '').split(/\//);
     } else if(!(Array.isArray(path))) {
@@ -43,7 +48,7 @@ function robustDecodeURIComponent(uri) {
 
 function parsePattern (pattern) {
     var bits = normalizePath(pattern);
-    // Parse pattern segments and convert them to objects to be consumed by
+    // Parse pattern and convert it to objects to be consumed by
     // Node.setChild().
     return bits.map(function(bit) {
         // Support named but fixed values as
@@ -51,7 +56,7 @@ function parsePattern (pattern) {
         var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
         if (m) {
             if (m[1]) {
-                throw new Error("Modifiers are not yet implemented!");
+                throw new Error("Modifiers are not yet implemented: " + pattern);
             }
             return {
                 modifier: m[1],
@@ -69,6 +74,210 @@ function parsePattern (pattern) {
  * :SECTION 2:
  * Module class definitions
  ***/
+
+/**
+ * Represents a URI object which can optionally contain and
+ * bind optional variables encountered in the URI string
+ *
+ * @param {String|URI} uri the URI path or object to create a new URI from
+ * @param {Object} params the values for variables encountered in the URI path (optional)
+ */
+function URI(uri, params) {
+    // Public, read-only property.
+    this.path = [];
+    if (uri && uri.constructor === URI) {
+        uri.path.forEach(function (item) {
+            if (item.constructor === Object) {
+                this.path.push({
+                    modifier: item.modifier,
+                    name: item.name,
+                    pattern: item.pattern
+                });
+            } else {
+                this.path.push(item);
+            }
+        }, this);
+    } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
+        this.path = parsePattern(uri);
+    }
+    this._str = null;
+    if (params) {
+        this.bind(params);
+    }
+}
+
+/**
+ * Binds the provided parameter values to URI's variable components
+ *
+ * @param {Object} params the parameters (and their values) to bind
+ * @return {URI} this URI object
+ */
+URI.prototype.bind = function (params) {
+    if (!params || params.constructor !== Object) {
+        // wrong params format
+        throw new Error('Expected URI parameter object, got ' + params);
+    }
+    // look only for parameter keys which match
+    // variables in the URI
+    this.path.forEach(function (item) {
+        if(item && item.constructor === Object && params[item.name]) {
+            item.pattern = params[item.name];
+            // we have changed a value, so invalidate the string cache
+            this._str = null;
+        }
+    }, this);
+    return this;
+};
+
+/**
+ * Checks if the URI starts with the given path prefix
+ *
+ * @param {String|URI} pathOrURI the prefix path to check for
+ * @return {Boolean} whether this URI starts with the given prefix path
+ */
+URI.prototype.startsWith = function (pathOrURI) {
+    var uri;
+    if (!pathOrURI) {
+        return true;
+    }
+    if (pathOrURI.constructor === URI) {
+        uri = pathOrURI;
+    } else {
+        uri = new URI(pathOrURI);
+    }
+    // if our URI is shorter than the one we are
+    // comparing to, it doesn't start with that prefix
+    if (this.path.length < uri.path.length) {
+        return false;
+    }
+    // check each component
+    for (var idx = 0; idx < uri.path.length; idx++) {
+        var mySeg = this.path[idx];
+        var otherSeg = uri.path[idx];
+        if (mySeg.constructor === Object && otherSeg.constructor === Object) {
+            // both path are named variables
+            // nothing to do
+            continue;
+        } else if (mySeg.constructor === Object) {
+            // we have a named variable, but there is a string
+            // given in the prefix
+            if (mySeg.pattern && mySeg.pattern !== otherSeg) {
+                // they differ
+                return false;
+            }
+        } else if (otherSeg.constructor === Object) {
+            // we have a fixed string, but a variable has been
+            // given in the prefix - nothing to do
+            continue;
+        } else if (mySeg !== otherSeg) {
+            // both are strings, but they differ
+            return false;
+        }
+    }
+    // ok, no differences found
+    return true;
+};
+
+/**
+ * Appends the specified suffix to this URI object
+ *
+ * @param {String|URI} pathOrURI the suffix to append
+ * @return {URI} this URI object
+ */
+URI.prototype.pushSuffix = function (pathOrURI) {
+    var suffix;
+    if (!pathOrURI) {
+        return this;
+    }
+    if (pathOrURI.constructor === URI) {
+        suffix = pathOrURI.path;
+    } else {
+        suffix = parsePattern(pathOrURI);
+    }
+    this.path = this.path.concat(suffix);
+    this._str = null;
+    return this;
+};
+
+/**
+ * Removes the given suffix from this URI object
+ *
+ * @param {String|URI} pathOrURI the suffix path to remove
+ * @return {URI} this URI object
+ */
+URI.prototype.popSuffix = function (pathOrURI) {
+    var suffix;
+    var mySeg = this.path;
+    var currSuffixIdx, currMyIdx;
+    if (!pathOrURI) {
+        return this;
+    }
+    // get the suffix to remove
+    if (pathOrURI.constructor === URI) {
+        suffix = pathOrURI.path;
+    } else {
+        suffix = parsePattern(pathOrURI);
+    }
+    // check the compatibility of each segment
+    currSuffixIdx = suffix.length - 1;
+    currMyIdx = mySeg.length - 1;
+    while (currMyIdx >= 0 && currSuffixIdx >= 0) {
+        var myCurr = mySeg[currMyIdx];
+        var suffCurr = suffix[currSuffixIdx];
+        var remove = true;
+        if (myCurr.constructor !== Object && suffCurr.constructor !== Object) {
+            if (myCurr !== suffCurr) {
+                remove = false;
+            }
+        }
+        if (!remove) {
+            break;
+        }
+        // ok, pop the segment
+        mySeg.pop();
+        this._str = null;
+        currMyIdx--;
+        currSuffixIdx--;
+    }
+    return this;
+};
+
+/**
+ * Builds and returns the full, bounded string path for this URI object
+ *
+ * @return {String} the complete path of this URI object
+ */
+URI.prototype.toString = function () {
+    if (this._str) {
+        // there is a cached version of the URI's string
+        return this._str;
+    }
+    this._str = '';
+    this.path.forEach(function (item) {
+        if (item.constructor === Object) {
+            if (item.pattern) {
+                // there is a known value for this variable,
+                // so use it
+                this._str += '/' + encodeURIComponent(item.pattern);
+            } else if (item.modifer) {
+                // we are dealing with a modifier, and there
+                // seems to be no value, so simply ignore the
+                // component
+                this._str += '';
+            } else {
+                // we have a variable component, but no value,
+                // so let's just return the variable name
+                this._str += '/{' + encodeURIComponent(item.name) + '}';
+            }
+        } else {
+            this._str += '/' + encodeURIComponent(item);
+        }
+    }, this);
+    return this._str;
+};
+
+URI.prototype.toJSON = URI.prototype.toString;
+
 
 /*
  * A node in the lookup graph.
@@ -164,205 +373,18 @@ Node.prototype.clone = function () {
 };
 
 
-/**
- * Represents a URI object which can optionally contain and
- * bind optional variables encountered in the URI string
- *
- * @param {String|URI} uri the URI path or object to create a new URI from
- * @param {Object} params the values for variables encountered in the URI path (optional)
- */
-function URI(uri, params) {
-    // Public, read-only property.
-    this.segments = [];
-    if (uri && uri.constructor === URI) {
-        uri.segments.forEach(function (item) {
-            if (item.constructor === Object) {
-                this.segments.push({
-                    modifier: item.modifier,
-                    name: item.name,
-                    pattern: item.pattern
-                });
-            } else {
-                this.segments.push(item);
-            }
-        }, this);
-    } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
-        this.segments = parsePattern(uri);
-    }
-    this._str = null;
-    if (params) {
-        this.bind(params);
-    }
-}
-
-/**
- * Binds the provided parameter values to URI's variable components
- *
- * @param {Object} params the parameters (and their values) to bind
- * @return {URI} this URI object
- */
-URI.prototype.bind = function (params) {
-    if (!params || params.constructor !== Object) {
-        // wrong params format
-        throw new Error('Expected URI parameter object, got ' + params);
-    }
-    // look only for parameter keys which match
-    // variables in the URI
-    this.segments.forEach(function (item) {
-        if(item && item.constructor === Object && params[item.name]) {
-            item.pattern = params[item.name];
-            // we have changed a value, so invalidate the string cache
-            this._str = null;
-        }
-    }, this);
-    return this;
-};
-
-/**
- * Checks if the URI starts with the given path prefix
- *
- * @param {String|URI} pathOrURI the prefix path to check for
- * @return {Boolean} whether this URI starts with the given prefix path
- */
-URI.prototype.startsWith = function (pathOrURI) {
-    var uri;
-    if (!pathOrURI) {
-        return true;
-    }
-    if (pathOrURI.constructor === URI) {
-        uri = pathOrURI;
-    } else {
-        uri = new URI(pathOrURI);
-    }
-    // if our URI is shorter than the one we are
-    // comparing to, it doesn't start with that prefix
-    if (this.segments.length < uri.segments.length) {
-        return false;
-    }
-    // check each component
-    for (var idx = 0; idx < uri.segments.length; idx++) {
-        var mySeg = this.segments[idx];
-        var otherSeg = uri.segments[idx];
-        if (mySeg.constructor === Object && otherSeg.constructor === Object) {
-            // both segments are named variables
-            // nothing to do
-            continue;
-        } else if (mySeg.constructor === Object) {
-            // we have a named variable, but there is a string
-            // given in the prefix
-            if (mySeg.pattern && mySeg.pattern !== otherSeg) {
-                // they differ
-                return false;
-            }
-        } else if (otherSeg.constructor === Object) {
-            // we have a fixed string, but a variable has been
-            // given in the prefix - nothing to do
-            continue;
-        } else if (mySeg !== otherSeg) {
-            // both are strings, but they differ
-            return false;
-        }
-    }
-    // ok, no differences found
-    return true;
-};
-
-/**
- * Appends the specified suffix to this URI object
- *
- * @param {String|URI} pathOrURI the suffix to append
- * @return {URI} this URI object
- */
-URI.prototype.pushSuffix = function (pathOrURI) {
-    var suffix;
-    if (!pathOrURI) {
-        return this;
-    }
-    if (pathOrURI.constructor === URI) {
-        suffix = pathOrURI.segments;
-    } else {
-        suffix = parsePattern(pathOrURI);
-    }
-    this.segments = this.segments.concat(suffix);
-    this._str = null;
-    return this;
-};
-
-/**
- * Removes the given suffix from this URI object
- *
- * @param {String|URI} pathOrURI the suffix path to remove
- * @return {URI} this URI object
- */
-URI.prototype.popSuffix = function (pathOrURI) {
-    var suffix;
-    var mySeg = this.segments;
-    var currSuffixIdx, currMyIdx;
-    if (!pathOrURI) {
-        return this;
-    }
-    // get the suffix to remove
-    if (pathOrURI.constructor === URI) {
-        suffix = pathOrURI.segments;
-    } else {
-        suffix = parsePattern(pathOrURI);
-    }
-    // check the compatibility of each segment
-    currSuffixIdx = suffix.length - 1;
-    currMyIdx = mySeg.length - 1;
-    while (currMyIdx >= 0 && currSuffixIdx >= 0) {
-        var myCurr = mySeg[currMyIdx];
-        var suffCurr = suffix[currSuffixIdx];
-        var remove = true;
-        if (myCurr.constructor !== Object && suffCurr.constructor !== Object) {
-            if (myCurr !== suffCurr) {
-                remove = false;
-            }
-        }
-        if (!remove) {
-            break;
-        }
-        // ok, pop the segment
-        mySeg.pop();
-        this._str = null;
-        currMyIdx--;
-        currSuffixIdx--;
-    }
-    return this;
-};
-
-/**
- * Builds and returns the full, bounded string path for this URI object
- *
- * @return {String} the complete path of this URI object
- */
-URI.prototype.toString = function () {
-    if (this._str) {
-        // there is a cached version of the URI's string
-        return this._str;
-    }
-    this._str = '';
-    this.segments.forEach(function (item) {
-        if (item.constructor === Object) {
-            if (item.pattern) {
-                // there is a known value for this variable,
-                // so use it
-                this._str += '/' + encodeURIComponent(item.pattern);
-            } else if (item.modifer) {
-                // we are dealing with a modifier, and there
-                // seems to be no value, so simply ignore the
-                // component
-                this._str += '';
-            } else {
-                // we have a variable component, but no value,
-                // so let's just return the variable name
-                this._str += '/{' + encodeURIComponent(item.name) + '}';
-            }
-        } else {
-            this._str += '/' + encodeURIComponent(item);
-        }
-    }, this);
-    return this._str;
+// Call promise-returning fn for each node value, with the path to the value
+Node.prototype.visitAsync = function(fn, path) {
+    path = path || [];
+    var self = this;
+    // First value, then each of the children (one by one)
+    return fn(self.value, path)
+    .then(function() {
+        return Promise.resolve(Object.keys(self._children))
+        .each(function(childKey) {
+            return self._children[childKey].visitAsync(fn, path.concat([childKey]));
+        });
+    });
 };
 
 
@@ -377,13 +399,13 @@ function Router (options) {
     this._root = new Node();
 }
 
-// XXX modules: variant that builds a prefix tree from segments, but pass in a
-// spec instead of a value
-Router.prototype._buildTree = function(segments, value) {
+// XXX modules: variant that builds a prefix tree from a path array, but pass
+// in a spec instead of a value
+Router.prototype._buildTree = function(path, value) {
     var node = new Node();
-    if (segments.length) {
-        var segment = segments[0];
-        var subTree = this._buildTree(segments.slice(1), value);
+    if (path.length) {
+        var segment = path[0];
+        var subTree = this._buildTree(path.slice(1), value);
         node.setChild(segment, subTree);
     } else {
         node.value = value;
@@ -394,9 +416,9 @@ Router.prototype._buildTree = function(segments, value) {
 
 Router.prototype.specToTree = function (spec) {
     var root = new Node(/*{ spec: spec }*/);
-    for (var path in spec.paths) {
-        var segments = parsePattern(path);
-        this._extend(segments, root, spec.paths[path]);
+    for (var pathPattern in spec.paths) {
+        var path = parsePattern(pathPattern);
+        this._extend(path, root, spec.paths[pathPattern]);
     }
     return root;
 };
@@ -475,7 +497,9 @@ Router.prototype._lookup = function route(path, node) {
  *  }
  */
 Router.prototype.lookup = function route(path) {
-    path = normalizePath(path);
+    if (!path || path.constructor !== URI) {
+        path = normalizePath(path);
+    }
     var res = this._lookup(path, this._root);
     if (res) {
         return {
