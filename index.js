@@ -1,9 +1,14 @@
 "use strict";
 
+if (!global.Promise || !global.Promise.promisify) {
+    global.Promise = require('bluebird');
+}
+
 /***
  * :SECTION 1:
  * Private module variables and methods
  ***/
+
 
 function normalizePath (path) {
     if (path && path.constructor === String) {
@@ -51,7 +56,7 @@ function parsePattern (pattern) {
         var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
         if (m) {
             if (m[1]) {
-                throw new Error("Modifiers are not yet implemented!");
+                throw new Error("Modifiers are not yet implemented: " + pattern);
             }
             return {
                 modifier: m[1],
@@ -368,6 +373,19 @@ Node.prototype.clone = function () {
 };
 
 
+// Call promise-returning fn for each node value, with the path to the value
+Node.prototype.visitAsync = function(fn, path) {
+    path = path || [];
+    var self = this;
+    // First value, then each of the children (one by one)
+    return fn(self.value, path)
+    .then(function() {
+        return Promise.resolve(Object.keys(self._children))
+        .each(function(childKey) {
+            return self._children[childKey].visitAsync(fn, path.concat([childKey]));
+        });
+    });
+};
 
 
 /*
