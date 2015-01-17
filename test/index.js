@@ -31,7 +31,9 @@ var specs = [
             '/double/': '/double/',
             '/double//': '/double//',
             '/double//slash': '/double//slash',
-            '/some/really/long/path': '/some/really/long/path'
+            '/some/really/long/path': '/some/really/long/path',
+            // Modifiers: optional path segments
+            '/several{/optional}{/path}{/segments}': '/several{/optional}{/path}{/segments}',
         }
     }
 ];
@@ -122,6 +124,38 @@ var expectations = {
         value: '/some/really/long/path',
         params: {
             domain: 'en.wikipedia.org'
+        }
+    },
+
+    // Optional path segments
+    '/en.wikipedia.org/v1/several': {
+        value: '/several{/optional}{/path}{/segments}',
+        params: {
+            domain: 'en.wikipedia.org'
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional': {
+        value: '/several{/optional}{/path}{/segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional'
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional/path': {
+        value: '/several{/optional}{/path}{/segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path'
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional/path/segments': {
+        value: '/several{/optional}{/path}{/segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path',
+            segments: 'segments',
         }
     },
 
@@ -219,7 +253,10 @@ describe('URI', function() {
     });
 
     it('construct from array', function() {
-        var uri = new URI(['{domain:some}','a/b', 'to', '100%'], {domain: 'foo/bar'}, true);
+        var uri = new URI([{
+            name: 'domain',
+            pattern: 'some'
+        },'a/b', 'to', '100%'], {domain: 'foo/bar'}, true);
         // Note how the invalid % encoding is fixed up to %25
         deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25');
         // Try once more for caching

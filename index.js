@@ -10,27 +10,6 @@ if (!global.Promise || !global.Promise.promisify) {
  ***/
 
 
-function normalizePath (path) {
-    if (path && path.constructor === String) {
-        // Strip a leading slash & split on remaining slashes
-        path = path.replace(/^\//, '').split(/\//);
-    } else if(!(Array.isArray(path))) {
-        throw new Error("Invalid path: " + path);
-    }
-    // Re-join {/var} patterns
-    for (var i = 0; i < path.length - 1; i++) {
-        if (/{$/.test(path[i]) && /}$/.test(path[i+1])) {
-            var rest = path[i].replace(/{$/, '');
-            if (rest.length) {
-                path.splice(i, 2, rest, '{/' + path[i+1]);
-            } else {
-                path.splice(i, 2, '{/' + path[i+1]);
-            }
-        }
-    }
-    return path;
-}
-
 
 function robustDecodeURIComponent(uri) {
     if (!/%/.test(uri)) {
@@ -46,30 +25,42 @@ function robustDecodeURIComponent(uri) {
     }
 }
 
+var splitRe = /(\/)(?:\{([\+])?([^:\}\/]+)(?::([^}]+))?\}|([^\/\{]*))|(?:{\/)([^:\}\/]+)(?::([^}]+))?\}/g;
 function parsePattern (pattern, isPattern) {
-    var bits = normalizePath(pattern);
-    if (isPattern) {
-        // Parse pattern and convert it to objects to be consumed by
-        // Node.setChild().
-        return bits.map(function(bit) {
-            // Support named but fixed values as
-            // {domain:en.wikipedia.org}
-            var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
-            if (m) {
-                return {
-                    modifier: m[1],
-                    name: m[2],
-                    pattern: m[3] !== undefined ? robustDecodeURIComponent(m[3]) : undefined
-                };
-            } else {
-                return robustDecodeURIComponent(bit);
-            }
-        });
+    if (Array.isArray(pattern)) {
+        return pattern;
     } else {
-        // Normal URI parsing: no pattern recognition.
-        return bits.map(function(bit) {
-            return robustDecodeURIComponent(bit);
-        });
+        var res = [];
+        splitRe.lastIndex = 0;
+        var m;
+        do {
+            m = splitRe.exec(pattern);
+            if (m) {
+                if (m[1] === '/') {
+                    if (m[5] !== undefined) {
+                        // plain path segment
+                        res.push(robustDecodeURIComponent(m[5]));
+                    } else if (m[3]) {
+                        // templated path segment
+                        res.push({
+                            name: m[3],
+                            modifier: m[2],
+                            pattern: m[4]
+                        });
+                    }
+                } else if (m[6]) {
+                    // Optional path segment: {/foo} or {/foo:bar}
+                    res.push({
+                        name: m[6],
+                        modifier: '/',
+                        pattern: m[7]
+                    });
+                } else {
+                    throw new Error('The impossible happened!');
+                }
+            }
+        } while (m);
+        return res;
     }
 }
 
@@ -360,6 +351,10 @@ Router.prototype._buildTree = function(path, value) {
         var segment = path[0];
         var subTree = this._buildTree(path.slice(1), value);
         node.setChild(segment, subTree);
+        if (segment.modifier === '/') {
+            // Set the value for each optional path segment
+            node.value = value;
+        }
     } else {
         node.value = value;
     }
@@ -450,8 +445,10 @@ Router.prototype._lookup = function route(path, node) {
  *  }
  */
 Router.prototype.lookup = function route(path) {
-    if (!path || path.constructor !== URI) {
-        path = normalizePath(path);
+    if (!path) {
+        throw new Error('Path expected!');
+    } else if (path.constructor === String) {
+        path = parsePattern(path);
     } else if (path.constructor === URI) {
         path = path.path;
     }
