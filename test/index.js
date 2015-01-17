@@ -183,45 +183,45 @@ describe('Repeat on cloned tree', function() {
 
 describe('URI', function() {
     it('to URI and back', function() {
-        var uri = new URI('/{domain:some}/path/to/something');
+        var uri = new URI('/{domain:some}/path/to/something', {}, true);
         uri = new URI(uri);
         uri.bind({domain: 'foo/bar'});
         deepEqual(uri.toString(), '/foo%2Fbar/path/to/something');
     });
 
     it('{/patterns} empty', function() {
-        var uri = new URI('/{domain:some}/path/to{/optionalPath}');
+        var uri = new URI('/{domain:some}/path/to{/optionalPath}', {}, true);
         uri = new URI(uri);
         uri.bind({domain: 'foo'});
         deepEqual(uri.toString(), '/foo/path/to');
     });
 
     it('{/patterns} bound', function() {
-        var uri = new URI('/{domain:some}/path/to{/optionalPath}');
+        var uri = new URI('/{domain:some}/path/to{/optionalPath}', {}, true);
         uri = new URI(uri);
         uri.bind({optionalPath: 'foo'});
         deepEqual(uri.toString(), '/some/path/to/foo');
     });
 
     it('{+patterns} empty', function() {
-        var uri = new URI('/{domain:some}/path/to/{+rest}');
+        var uri = new URI('/{domain:some}/path/to/{+rest}', {}, true);
         deepEqual(uri.toString(), '/some/path/to/');
     });
 
     it('{+patterns} bound', function() {
-        var uri = new URI('/{domain:some}/path/to/{+rest}');
+        var uri = new URI('/{domain:some}/path/to/{+rest}', {}, true);
         uri.bind({rest: 'foo'});
         deepEqual(uri.toString(), '/some/path/to/foo');
     });
 
     it('decoding / encoding', function() {
-        var uri = new URI('/{domain:some}/a%2Fb/to/100%/%FF', {domain: 'foo/bar'});
+        var uri = new URI('/{domain:some}/a%2Fb/to/100%/%FF', {domain: 'foo/bar'}, true);
         // Note how the invalid % encoding is fixed up to %25
         deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25/%25FF');
     });
 
     it('construct from array', function() {
-        var uri = new URI(['{domain:some}','a/b', 'to', '100%'], {domain: 'foo/bar'});
+        var uri = new URI(['{domain:some}','a/b', 'to', '100%'], {domain: 'foo/bar'}, true);
         // Note how the invalid % encoding is fixed up to %25
         deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25');
         // Try once more for caching
@@ -229,20 +229,20 @@ describe('URI', function() {
     });
 
     it('append a suffix path', function() {
-        var uri = new URI('/{domain:test.com}/v1');
+        var uri = new URI('/{domain:test.com}/v1', {}, true);
         uri.pushSuffix('/page/{title}');
         uri.bind({title: 'foo'});
-        deepEqual(uri.toString(), '/test.com/v1/page/foo');
+        deepEqual(uri.toString(), '/test.com/v1/page/foo', {}, true);
     });
 
     it('remove a suffix path', function() {
-        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        var uri = new URI('/{domain:test.com}/v1/page/{title}', {}, true);
         uri.popSuffix('/page/{title}');
         deepEqual(uri.toString(), '/test.com/v1');
     });
 
     it('check for a prefix path', function() {
-        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        var uri = new URI('/{domain:test.com}/v1/page/{title}', {}, true);
         deepEqual(uri.startsWith('/test.com/v1/page'), true);
     });
 });

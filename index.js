@@ -46,27 +46,31 @@ function robustDecodeURIComponent(uri) {
     }
 }
 
-function parsePattern (pattern) {
+function parsePattern (pattern, isPattern) {
     var bits = normalizePath(pattern);
-    // Parse pattern and convert it to objects to be consumed by
-    // Node.setChild().
-    return bits.map(function(bit) {
-        // Support named but fixed values as
-        // {domain:en.wikipedia.org}
-        var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
-        if (m) {
-///            if (m[1]) {
-///                throw new Error("Modifiers are not yet implemented: " + pattern);
-///            }
-            return {
-                modifier: m[1],
-                name: m[2],
-                pattern: robustDecodeURIComponent(m[3] || '')
-            };
-        } else {
+    if (isPattern) {
+        // Parse pattern and convert it to objects to be consumed by
+        // Node.setChild().
+        return bits.map(function(bit) {
+            // Support named but fixed values as
+            // {domain:en.wikipedia.org}
+            var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
+            if (m) {
+                return {
+                    modifier: m[1],
+                    name: m[2],
+                    pattern: robustDecodeURIComponent(m[3] || '')
+                };
+            } else {
+                return robustDecodeURIComponent(bit);
+            }
+        });
+    } else {
+        // Normal URI parsing: no pattern recognition.
+        return bits.map(function(bit) {
             return robustDecodeURIComponent(bit);
-        }
-    });
+        });
+    }
 }
 
 
@@ -82,7 +86,7 @@ function parsePattern (pattern) {
  * @param {String|URI} uri the URI path or object to create a new URI from
  * @param {Object} params the values for variables encountered in the URI path (optional)
  */
-function URI(uri, params) {
+function URI(uri, params, isPattern) {
     // Public, read-only property.
     this.path = [];
     if (uri && uri.constructor === URI) {
@@ -98,7 +102,7 @@ function URI(uri, params) {
             }
         }, this);
     } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
-        this.path = parsePattern(uri);
+        this.path = parsePattern(uri, isPattern);
     } else if (uri !== '') {
         throw new Error('Invalid path passed into URI constructor: ' + uri);
     }
@@ -194,7 +198,7 @@ URI.prototype.pushSuffix = function (pathOrURI) {
     if (pathOrURI.constructor === URI) {
         suffix = pathOrURI.path;
     } else {
-        suffix = parsePattern(pathOrURI);
+        suffix = parsePattern(pathOrURI, true);
     }
     this.path = this.path.concat(suffix);
     this._str = null;
@@ -218,7 +222,7 @@ URI.prototype.popSuffix = function (pathOrURI) {
     if (pathOrURI.constructor === URI) {
         suffix = pathOrURI.path;
     } else {
-        suffix = parsePattern(pathOrURI);
+        suffix = parsePattern(pathOrURI, true);
     }
     // check the compatibility of each segment
     currSuffixIdx = suffix.length - 1;
@@ -431,7 +435,7 @@ Router.prototype._buildTree = function(path, value) {
 Router.prototype.specToTree = function (spec) {
     var root = new Node(/*{ spec: spec }*/);
     for (var pathPattern in spec.paths) {
-        var path = parsePattern(pathPattern);
+        var path = parsePattern(pathPattern, true);
         this._extend(path, root, spec.paths[pathPattern]);
     }
     return root;
