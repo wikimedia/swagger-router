@@ -184,22 +184,19 @@ describe('Repeat on cloned tree', function() {
 describe('URI', function() {
     it('to URI and back', function() {
         var uri = new URI('/{domain:some}/path/to/something', {}, true);
-        uri = new URI(uri);
-        uri.bind({domain: 'foo/bar'});
+        uri = new URI(uri, {domain: 'foo/bar'});
         deepEqual(uri.toString(), '/foo%2Fbar/path/to/something');
     });
 
     it('{/patterns} empty', function() {
         var uri = new URI('/{domain:some}/path/to{/optionalPath}', {}, true);
-        uri = new URI(uri);
-        uri.bind({domain: 'foo'});
+        uri = new URI(uri, {domain: 'foo'});
         deepEqual(uri.toString(), '/foo/path/to');
     });
 
     it('{/patterns} bound', function() {
         var uri = new URI('/{domain:some}/path/to{/optionalPath}', {}, true);
-        uri = new URI(uri);
-        uri.bind({optionalPath: 'foo'});
+        uri.params = {optionalPath: 'foo'};
         deepEqual(uri.toString(), '/some/path/to/foo');
     });
 
@@ -209,8 +206,8 @@ describe('URI', function() {
     });
 
     it('{+patterns} bound', function() {
-        var uri = new URI('/{domain:some}/path/to/{+rest}', {}, true);
-        uri.bind({rest: 'foo'});
+        var uri = new URI('/{domain:some}/path/to/{+rest}',
+                {rest: 'foo'}, true);
         deepEqual(uri.toString(), '/some/path/to/foo');
     });
 
@@ -229,15 +226,15 @@ describe('URI', function() {
     });
 
     it('append a suffix path', function() {
-        var uri = new URI('/{domain:test.com}/v1', {}, true);
-        uri.pushSuffix('/page/{title}');
-        uri.bind({title: 'foo'});
+        var baseURI = new URI('/{domain:test.com}/v1', {}, true);
+        var suffix = new URI('/page/{title}', {}, true);
+        var uri = new URI(baseURI.path.concat(suffix.path), {title: 'foo'});
         deepEqual(uri.toString(), '/test.com/v1/page/foo', {}, true);
     });
 
     it('remove a suffix path', function() {
-        var uri = new URI('/{domain:test.com}/v1/page/{title}', {}, true);
-        uri.popSuffix('/page/{title}');
+        var basePath = new URI('/{domain:test.com}/v1/page/{title}', {}, true).path;
+        var uri = new URI(basePath.slice(0, basePath.length - 2));
         deepEqual(uri.toString(), '/test.com/v1');
     });
 

@@ -59,7 +59,7 @@ function parsePattern (pattern, isPattern) {
                 return {
                     modifier: m[1],
                     name: m[2],
-                    pattern: robustDecodeURIComponent(m[3] || '')
+                    pattern: m[3] !== undefined ? robustDecodeURIComponent(m[3]) : undefined
                 };
             } else {
                 return robustDecodeURIComponent(bit);
@@ -85,54 +85,67 @@ function parsePattern (pattern, isPattern) {
  *
  * @param {String|URI} uri the URI path or object to create a new URI from
  * @param {Object} params the values for variables encountered in the URI path (optional)
+ * @param {boolean} asPattern Whether to parse the URI as a pattern (optional)
+ * @return {URI} URI object. Public properties:
+ *  - `params` {object} mutable. Parameter object.
+ *  - `path` {array} immutable.
  */
 function URI(uri, params, isPattern) {
-    // Public, read-only property.
-    this.path = [];
+    this.params = params || {};
     if (uri && uri.constructor === URI) {
-        uri.path.forEach(function (item) {
-            if (item.constructor === Object) {
-                this.path.push({
-                    modifier: item.modifier,
-                    name: item.name,
-                    pattern: item.pattern
-                });
-            } else {
-                this.path.push(item);
-            }
-        }, this);
+        // this.path is considered immutable, so can be shared with other URI
+        // instances
+        this.path = uri.path;
     } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
         this.path = parsePattern(uri, isPattern);
     } else if (uri !== '') {
         throw new Error('Invalid path passed into URI constructor: ' + uri);
     }
-    this._str = null;
-    if (params) {
-        this.bind(params);
-    }
 }
 
 /**
- * Binds the provided parameter values to URI's variable components
+ * Builds and returns the full, bounded string path for this URI object
  *
- * @param {Object} params the parameters (and their values) to bind
- * @return {URI} this URI object
+ * @return {String} the complete path of this URI object
+ * @param {Boolean} asPattern Whether to serialize to a pattern [optional]
+ * @return {string} URI path
  */
-URI.prototype.bind = function (params) {
-    if (!params || params.constructor !== Object) {
-        // wrong params format
-        throw new Error('Expected URI parameter object, got ' + params);
-    }
-    // look only for parameter keys which match
-    // variables in the URI
-    this.path.forEach(function (item) {
-        if(item && item.constructor === Object && params[item.name]) {
-            item.pattern = params[item.name];
-            // we have changed a value, so invalidate the string cache
-            this._str = null;
+URI.prototype.toString = function (asPattern) {
+    var uriStr = '';
+    for (var i = 0; i < this.path.length; i++) {
+        var segment = this.path[i];
+        if (segment.constructor === Object) {
+            var segmentValue = this.params[segment.name];
+            if (segmentValue === undefined) {
+                segmentValue = segment.pattern;
+            }
+
+            if (segmentValue !== undefined) {
+                if (!asPattern || !segment.name) {
+                    // Normal mode
+                    uriStr += '/' + encodeURIComponent(segmentValue);
+                } else {
+                    uriStr += '/{' + (segment.modifier || '')
+                        + encodeURIComponent(segment.name) + ':'
+                        + encodeURIComponent(segmentValue) + '}';
+                }
+            } else if (asPattern) {
+                uriStr += '{' + segment.modifier
+                    + encodeURIComponent(segment.name)
+                    + '}';
+            } else {
+                if (segment.modifier === '+') {
+                    // Add trailing slash
+                    uriStr += '/';
+                }
+                // Omit optional segment & return
+                return uriStr;
+            }
+        } else {
+            uriStr += '/' + encodeURIComponent(segment);
         }
-    }, this);
-    return this;
+    }
+    return uriStr;
 };
 
 /**
@@ -182,106 +195,6 @@ URI.prototype.startsWith = function (pathOrURI) {
     }
     // ok, no differences found
     return true;
-};
-
-/**
- * Appends the specified suffix to this URI object
- *
- * @param {String|URI} pathOrURI the suffix to append
- * @return {URI} this URI object
- */
-URI.prototype.pushSuffix = function (pathOrURI) {
-    var suffix;
-    if (!pathOrURI) {
-        return this;
-    }
-    if (pathOrURI.constructor === URI) {
-        suffix = pathOrURI.path;
-    } else {
-        suffix = parsePattern(pathOrURI, true);
-    }
-    this.path = this.path.concat(suffix);
-    this._str = null;
-    return this;
-};
-
-/**
- * Removes the given suffix from this URI object
- *
- * @param {String|URI} pathOrURI the suffix path to remove
- * @return {URI} this URI object
- */
-URI.prototype.popSuffix = function (pathOrURI) {
-    var suffix;
-    var mySeg = this.path;
-    var currSuffixIdx, currMyIdx;
-    if (!pathOrURI) {
-        return this;
-    }
-    // get the suffix to remove
-    if (pathOrURI.constructor === URI) {
-        suffix = pathOrURI.path;
-    } else {
-        suffix = parsePattern(pathOrURI, true);
-    }
-    // check the compatibility of each segment
-    currSuffixIdx = suffix.length - 1;
-    currMyIdx = mySeg.length - 1;
-    while (currMyIdx >= 0 && currSuffixIdx >= 0) {
-        var myCurr = mySeg[currMyIdx];
-        var suffCurr = suffix[currSuffixIdx];
-        var remove = true;
-        if (myCurr.constructor !== Object && suffCurr.constructor !== Object) {
-            if (myCurr !== suffCurr) {
-                remove = false;
-            }
-        }
-        if (!remove) {
-            break;
-        }
-        // ok, pop the segment
-        mySeg.pop();
-        this._str = null;
-        currMyIdx--;
-        currSuffixIdx--;
-    }
-    return this;
-};
-
-/**
- * Builds and returns the full, bounded string path for this URI object
- *
- * @return {String} the complete path of this URI object
- */
-URI.prototype.toString = function () {
-    if (this._str) {
-        // there is a cached version of the URI's string
-        return this._str;
-    }
-    this._str = '';
-    this.path.forEach(function (item) {
-        if (item.constructor === Object) {
-            if (item.pattern) {
-                // there is a known value for this variable,
-                // so use it
-                this._str += '/' + encodeURIComponent(item.pattern);
-            } else if (item.modifier) {
-                // we are dealing with a modifier, and there
-                // seems to be no value, so check the modifier type
-                if (item.modifier === '+') {
-                    // we need to add a slash for a +
-                    this._str += '/';
-                }
-            } else {
-                // we have a variable component, but no value,
-                // so let's just return the variable name
-                this._str += '/{' + encodeURIComponent(item.name) + '}';
-            }
-        } else {
-            this._str += '/' + encodeURIComponent(item);
-        }
-    }, this);
-    return this._str;
 };
 
 // For JSON.stringify
