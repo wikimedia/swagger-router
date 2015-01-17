@@ -114,7 +114,7 @@ URI.prototype.toString = function (asPattern) {
     var uriStr = '';
     for (var i = 0; i < this.path.length; i++) {
         var segment = this.path[i];
-        if (segment.constructor === Object) {
+        if (segment && segment.constructor === Object) {
             var segmentValue = this.params[segment.name];
             if (segmentValue === undefined) {
                 segmentValue = segment.pattern;
@@ -146,6 +146,28 @@ URI.prototype.toString = function (asPattern) {
         }
     }
     return uriStr;
+};
+
+
+/**
+ * Expand all parameters in the URI and return a new URI.
+ * @return {URI}
+ */
+URI.prototype.expand = function() {
+    var res = new Array(this.path.length);
+    for (var i = 0; i < this.path.length; i++) {
+        var segment = this.path[i];
+        if (segment && segment.constructor === Object) {
+            var segmentValue = this.params[segment.name];
+            if (segmentValue === undefined) {
+                segmentValue = segment.pattern;
+            }
+            res[i] = segmentValue;
+        } else {
+            res[i] = segment;
+        }
+    }
+    return new URI(res);
 };
 
 /**

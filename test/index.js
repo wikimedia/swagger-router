@@ -186,6 +186,7 @@ describe('URI', function() {
         var uri = new URI('/{domain:some}/path/to/something', {}, true);
         uri = new URI(uri, {domain: 'foo/bar'});
         deepEqual(uri.toString(), '/foo%2Fbar/path/to/something');
+        deepEqual(uri.expand().path, ['foo/bar','path','to','something']);
     });
 
     it('{/patterns} empty', function() {
@@ -230,6 +231,7 @@ describe('URI', function() {
         var suffix = new URI('/page/{title}', {}, true);
         var uri = new URI(baseURI.path.concat(suffix.path), {title: 'foo'});
         deepEqual(uri.toString(), '/test.com/v1/page/foo', {}, true);
+        deepEqual(uri.expand().path, ['test.com', 'v1', 'page', 'foo']);
     });
 
     it('remove a suffix path', function() {
