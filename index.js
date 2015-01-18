@@ -285,7 +285,7 @@ Node.prototype.getChild = function(segment, params) {
             }
             return res;
         } else {
-            // Don't match the wildcard with an empty segment.
+            // Don't match the wildcards with an empty segment.
             return this._children[this._keyPrefix + segment];
         }
 
@@ -340,10 +340,16 @@ Node.prototype.visitAsync = function(fn, path) {
         return Promise.resolve(Object.keys(self._children))
         .each(function(childKey) {
             var segment = childKey.replace(/^\//, '');
-            if (segment === 'wildcard') {
-                segment = '';
+            if (segment === 'wildcard' || segment === 'multiwildcard') {
+                segment = '_' + segment;
             }
-            return self._children[childKey].visitAsync(fn, path.concat([segment]));
+            var child = self._children[childKey];
+            if (child === self) {
+                // Don't enter an infinite loop on multiwildcard
+                return;
+            } else {
+                return child.visitAsync(fn, path.concat([segment]));
+            }
         });
     });
 };
