@@ -230,13 +230,9 @@ URI.prototype.inspect = function () {
  *
  * We use a single monomorphic type for the JIT's benefit.
  */
-function Node (info) {
-    // Exensible info object. Public read-only property.
-    // Typical members:
-    // - spec: the original spec object (for doc purposes)
-    this.info = info || {};
+function Node (value) {
     // The value for a path ending on this node. Public property.
-    this.value = null;
+    this.value = value || null;
 
     // Internal properties.
     this._children = {};
@@ -359,7 +355,6 @@ Node.prototype.visitAsync = function(fn, path) {
 Node.prototype.toJSON = function () {
     if (this._children['**'] === this) {
         return {
-            info: this.info,
             value: this.value,
             _children: '<recursive>',
             _paramName: this._paramName
@@ -410,7 +405,7 @@ Router.prototype._buildTree = function(path, value) {
 
 
 Router.prototype.specToTree = function (spec) {
-    var root = new Node(/*{ spec: spec }*/);
+    var root = new Node();
     for (var pathPattern in spec.paths) {
         var path = parsePattern(pathPattern, true);
         this._extend(path, root, spec.paths[pathPattern]);
