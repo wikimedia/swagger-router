@@ -258,11 +258,11 @@ Node.prototype.setChild = function(key, child) {
         this._children[this._keyPrefix + key.pattern] = child;
     } else if (key.modifier === '+') {
         child._paramName = key.name;
-        this._children.multiwildcard = child;
+        this._children['**'] = child;
     } else {
         // Setting up a wildcard match
         child._paramName = key.name;
-        this._children.wildcard = child;
+        this._children['*'] = child;
     }
 };
 
@@ -272,12 +272,12 @@ Node.prototype.getChild = function(segment, params) {
         if (segment !== '') {
             var res = this._children[this._keyPrefix + segment]
                 // Fall back to the wildcard match
-                || this._children.wildcard
-                || this._children.multiwildcard
+                || this._children['*']
+                || this._children['**']
                 || null;
             if (res && res._paramName) {
-                if (this._children.multiwildcard === res) {
-                    // Build up an array for multiwildcard matches ({+foo})
+                if (this._children['**'] === res) {
+                    // Build up an array for ** matches ({+foo})
                     if (!Array.isArray(params[res._paramName])) {
                         params[res._paramName] = [segment];
                     } else {
@@ -298,20 +298,20 @@ Node.prototype.getChild = function(segment, params) {
     } else if (segment.pattern) {
         // Unwrap the pattern
         return this.getChild(segment.pattern, params);
-    } else if (this._children.wildcard
-            && this._children.wildcard._paramName === segment.name) {
+    } else if (this._children['*']
+            && this._children['*']._paramName === segment.name) {
         // XXX: also compare modifier!
-        return this._children.wildcard || null;
+        return this._children['*'] || null;
     }
 };
 
 Node.prototype.hasChildren = function () {
-    return Object.keys(this._children).length || this._children.wildcard;
+    return Object.keys(this._children).length || this._children['*'];
 };
 
 Node.prototype.keys = function () {
     var self = this;
-    if (this._children.wildcard) {
+    if (this._children['*']) {
         return [];
     } else {
         var res = [];
@@ -344,12 +344,9 @@ Node.prototype.visitAsync = function(fn, path) {
         return Promise.resolve(Object.keys(self._children))
         .each(function(childKey) {
             var segment = childKey.replace(/^\//, '');
-            if (segment === 'wildcard' || segment === 'multiwildcard') {
-                segment = '_' + segment;
-            }
             var child = self._children[childKey];
             if (child === self) {
-                // Don't enter an infinite loop on multiwildcard
+                // Don't enter an infinite loop on **
                 return;
             } else {
                 return child.visitAsync(fn, path.concat([segment]));
@@ -358,9 +355,9 @@ Node.prototype.visitAsync = function(fn, path) {
     });
 };
 
-// Work around recursive structure in multiwildcard terminal nodes
+// Work around recursive structure in ** terminal nodes
 Node.prototype.toJSON = function () {
-    if (this._children.multiwildcard === this) {
+    if (this._children['**'] === this) {
         return {
             info: this.info,
             value: this.value,
