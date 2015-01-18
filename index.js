@@ -29,6 +29,10 @@ var splitRe = /(\/)(?:\{([\+])?([^:\}\/]+)(?::([^}]+))?\}|([^\/\{]*))|(?:{([\/\+
 function parsePattern (pattern, isPattern) {
     if (Array.isArray(pattern)) {
         return pattern;
+    } else if (!isPattern) {
+        return pattern.replace(/^\//, '').split(/\//).map(function(bit) {
+            return robustDecodeURIComponent(bit);
+        });
     } else {
         var res = [];
         splitRe.lastIndex = 0;

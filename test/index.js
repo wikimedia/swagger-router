@@ -241,6 +241,12 @@ describe('URI', function() {
         deepEqual(uri.expand().path, ['foo/bar','path','to','something']);
     });
 
+    it('to URI and back, no pattern', function() {
+        var uri = new URI('/{domain:some}/path/to/something', {domain: 'foo'});
+        deepEqual(uri.toString(), '/%7Bdomain%3Asome%7D/path/to/something');
+        deepEqual(uri.expand().path, ['{domain:some}','path','to','something']);
+    });
+
     it('{/patterns} empty', function() {
         var uri = new URI('/{domain:some}/path/to{/optionalPath}', {}, true);
         uri = new URI(uri, {domain: 'foo'});
