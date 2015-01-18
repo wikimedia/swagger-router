@@ -33,7 +33,7 @@ var specs = [
             '/double//slash': '/double//slash',
             '/some/really/long/path': '/some/really/long/path',
             // Modifiers: optional path segments
-            '/several{/optional}{/path}{/segments}': '/several{/optional}{/path}{/segments}',
+            '/several{/optional}{/path}{+segments}': '/several{/optional}{/path}{+segments}',
         }
     }
 ];
@@ -129,20 +129,20 @@ var expectations = {
 
     // Optional path segments
     '/en.wikipedia.org/v1/several': {
-        value: '/several{/optional}{/path}{/segments}',
+        value: '/several{/optional}{/path}{+segments}',
         params: {
             domain: 'en.wikipedia.org'
         }
     },
     '/en.wikipedia.org/v1/several/optional': {
-        value: '/several{/optional}{/path}{/segments}',
+        value: '/several{/optional}{/path}{+segments}',
         params: {
             domain: 'en.wikipedia.org',
             optional: 'optional'
         }
     },
     '/en.wikipedia.org/v1/several/optional/path': {
-        value: '/several{/optional}{/path}{/segments}',
+        value: '/several{/optional}{/path}{+segments}',
         params: {
             domain: 'en.wikipedia.org',
             optional: 'optional',
@@ -150,12 +150,30 @@ var expectations = {
         }
     },
     '/en.wikipedia.org/v1/several/optional/path/segments': {
-        value: '/several{/optional}{/path}{/segments}',
+        value: '/several{/optional}{/path}{+segments}',
         params: {
             domain: 'en.wikipedia.org',
             optional: 'optional',
             path: 'path',
-            segments: 'segments',
+            segments: ['segments'],
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional/path/segments/a': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path',
+            segments: ['segments','a'],
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional/path/segments/a/b': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path',
+            segments: ['segments','a','b'],
         }
     },
 

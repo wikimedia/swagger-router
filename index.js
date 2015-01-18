@@ -25,7 +25,7 @@ function robustDecodeURIComponent(uri) {
     }
 }
 
-var splitRe = /(\/)(?:\{([\+])?([^:\}\/]+)(?::([^}]+))?\}|([^\/\{]*))|(?:{\/)([^:\}\/]+)(?::([^}]+))?\}/g;
+var splitRe = /(\/)(?:\{([\+])?([^:\}\/]+)(?::([^}]+))?\}|([^\/\{]*))|(?:{([\/\+]))([^:\}\/]+)(?::([^}]+))?\}/g;
 function parsePattern (pattern, isPattern) {
     if (Array.isArray(pattern)) {
         return pattern;
@@ -48,12 +48,14 @@ function parsePattern (pattern, isPattern) {
                             pattern: m[4]
                         });
                     }
-                } else if (m[6]) {
-                    // Optional path segment: {/foo} or {/foo:bar}
+                } else if (m[7]) {
+                    // Optional path segment:
+                    // - {/foo} or {/foo:bar}
+                    // - {+foo}
                     res.push({
-                        name: m[6],
-                        modifier: '/',
-                        pattern: m[7]
+                        name: m[7],
+                        modifier: m[6],
+                        pattern: m[8]
                     });
                 } else {
                     throw new Error('The impossible happened!');
@@ -244,10 +246,15 @@ Node.prototype.setChild = function(key, child) {
     var self = this;
     if (key.constructor === String) {
         this._children[this._keyPrefix + key] = child;
-    } else if (key.name && key.pattern && key.pattern.constructor === String) {
+    } else if (key.name && key.pattern
+            && key.modifier !== '+'
+            && key.pattern.constructor === String) {
         // A named but plain key.
         child._paramName = key.name;
         this._children[this._keyPrefix + key.pattern] = child;
+    } else if (key.modifier === '+') {
+        child._paramName = key.name;
+        this._children.multiwildcard = child;
     } else {
         // Setting up a wildcard match
         child._paramName = key.name;
@@ -262,9 +269,19 @@ Node.prototype.getChild = function(segment, params) {
             var res = this._children[this._keyPrefix + segment]
                 // Fall back to the wildcard match
                 || this._children.wildcard
+                || this._children.multiwildcard
                 || null;
             if (res && res._paramName) {
-                params[res._paramName] = segment;
+                if (this._children.multiwildcard === res) {
+                    // Build up an array for multiwildcard matches ({+foo})
+                    if (!Array.isArray(params[res._paramName])) {
+                        params[res._paramName] = [segment];
+                    } else {
+                        params[res._paramName].push(segment);
+                    }
+                } else {
+                    params[res._paramName] = segment;
+                }
             }
             return res;
         } else {
@@ -331,6 +348,20 @@ Node.prototype.visitAsync = function(fn, path) {
     });
 };
 
+// Work around recursive structure in multiwildcard terminal nodes
+Node.prototype.toJSON = function () {
+    if (this._children.multiwildcard === this) {
+        return {
+            info: this.info,
+            value: this.value,
+            _children: '<recursive>',
+            _paramName: this._paramName
+        };
+    } else {
+        return this;
+    }
+};
+
 
 /*
  * The main router object
@@ -349,11 +380,20 @@ Router.prototype._buildTree = function(path, value) {
     var node = new Node();
     if (path.length) {
         var segment = path[0];
-        var subTree = this._buildTree(path.slice(1), value);
-        node.setChild(segment, subTree);
-        if (segment.modifier === '/') {
-            // Set the value for each optional path segment
+        if (segment.modifier === '+') {
+            // Set up a recursive match and end the traversal
+            var recursionNode = new Node();
+            recursionNode.value = value;
+            recursionNode.setChild(segment, recursionNode);
+            node.setChild(segment, recursionNode);
             node.value = value;
+        } else {
+            var subTree = this._buildTree(path.slice(1), value);
+            node.setChild(segment, subTree);
+            if (segment.modifier === '/') {
+                // Set the value for each optional path segment ({/foo})
+                node.value = value;
+            }
         }
     } else {
         node.value = value;
@@ -396,6 +436,9 @@ Router.prototype._extend = function route(path, node, value) {
         if (!nextNode || !nextNode.getChild) {
             // Found our extension point
             node.setChild(path[i], this._buildTree(path.slice(i+1), value));
+            //if (path[path.length - 1].modifier === '+') {
+            //    console.log(JSON.stringify(node, null, 2));
+            //}
             return;
         } else {
             node = nextNode;
