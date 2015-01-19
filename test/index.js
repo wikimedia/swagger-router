@@ -33,7 +33,8 @@ var specs = [
             '/double//slash': '/double//slash',
             '/some/really/long/path': '/some/really/long/path',
             // Modifiers: optional path segments
-            '/several{/optional}{/path}{+segments}': '/several{/optional}{/path}{+segments}',
+            '/simple/{templated}{/path}': '/simple/{templated}{/path}',
+            '/several{/optional}{/path}{+segments}': '/several{/optional}{/path}{+segments}'
         }
     }
 ];
@@ -176,6 +177,22 @@ var expectations = {
             segments: ['segments','a','b'],
         }
     },
+    '/en.wikipedia.org/v1/simple/templated': {
+        value: '/simple/{templated}{/path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            templated: 'templated'
+        }
+    },
+    '/en.wikipedia.org/v1/simple/templated/path': {
+        value: '/simple/{templated}{/path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            templated: 'templated',
+            path: 'path'
+        }
+    },
+    '/en.wikipedia.org/v1/simple/templated/path/toolong': null,
 
     // A few paths that should not match
     '/en.wikipedia.org/v1/pages': null,
