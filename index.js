@@ -388,13 +388,13 @@ Router.prototype._buildTree = function(path, value) {
             recursionNode.value = value;
             recursionNode.setChild(segment, recursionNode);
             node.setChild(segment, recursionNode);
-            node.value = value;
         } else {
             var subTree = this._buildTree(path.slice(1), value);
             node.setChild(segment, subTree);
             if (segment.modifier === '/') {
                 // Set the value for each optional path segment ({/foo})
                 node.value = value;
+                subTree.value = value;
             }
         }
     } else {

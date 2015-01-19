@@ -34,7 +34,8 @@ var specs = [
             '/some/really/long/path': '/some/really/long/path',
             // Modifiers: optional path segments
             '/simple/{templated}{/path}': '/simple/{templated}{/path}',
-            '/several{/optional}{/path}{+segments}': '/several{/optional}{/path}{+segments}'
+            '/several{/optional}{/path}{+segments}': '/several{/optional}{/path}{+segments}',
+            '/optional/{+path}': '/optional/{+path}'
         }
     }
 ];
@@ -193,6 +194,23 @@ var expectations = {
         }
     },
     '/en.wikipedia.org/v1/simple/templated/path/toolong': null,
+
+    '/en.wikipedia.org/v1/optional': null,
+    '/en.wikipedia.org/v1/optional/': null,
+    '/en.wikipedia.org/v1/optional/path': {
+        value: '/optional/{+path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            path: ['path']
+        }
+    },
+    '/en.wikipedia.org/v1/optional/path/bits': {
+        value: '/optional/{+path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            path: ['path','bits']
+        }
+    },
 
     // A few paths that should not match
     '/en.wikipedia.org/v1/pages': null,
