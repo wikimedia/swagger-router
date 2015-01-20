@@ -31,7 +31,11 @@ var specs = [
             '/double/': '/double/',
             '/double//': '/double//',
             '/double//slash': '/double//slash',
-            '/some/really/long/path': '/some/really/long/path'
+            '/some/really/long/path': '/some/really/long/path',
+            // Modifiers: optional path segments
+            '/simple/{templated}{/path}': '/simple/{templated}{/path}',
+            '/several{/optional}{/path}{+segments}': '/several{/optional}{/path}{+segments}',
+            '/optional/{+path}': '/optional/{+path}'
         }
     }
 ];
@@ -125,6 +129,89 @@ var expectations = {
         }
     },
 
+    // Optional path segments
+    '/en.wikipedia.org/v1/several': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org'
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional'
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional/path': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path'
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional/path/segments': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path',
+            segments: ['segments'],
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional/path/segments/a': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path',
+            segments: ['segments','a'],
+        }
+    },
+    '/en.wikipedia.org/v1/several/optional/path/segments/a/b': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path',
+            segments: ['segments','a','b'],
+        }
+    },
+    '/en.wikipedia.org/v1/simple/templated': {
+        value: '/simple/{templated}{/path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            templated: 'templated'
+        }
+    },
+    '/en.wikipedia.org/v1/simple/templated/path': {
+        value: '/simple/{templated}{/path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            templated: 'templated',
+            path: 'path'
+        }
+    },
+    '/en.wikipedia.org/v1/simple/templated/path/toolong': null,
+
+    '/en.wikipedia.org/v1/optional': null,
+    '/en.wikipedia.org/v1/optional/': null,
+    '/en.wikipedia.org/v1/optional/path': {
+        value: '/optional/{+path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            path: ['path']
+        }
+    },
+    '/en.wikipedia.org/v1/optional/path/bits': {
+        value: '/optional/{+path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            path: ['path','bits']
+        }
+    },
+
     // A few paths that should not match
     '/en.wikipedia.org/v1/pages': null,
     '/en.wikipedia.org/v1/pages/': null,
@@ -183,45 +270,52 @@ describe('Repeat on cloned tree', function() {
 
 describe('URI', function() {
     it('to URI and back', function() {
-        var uri = new URI('/{domain:some}/path/to/something');
-        uri = new URI(uri);
-        uri.bind({domain: 'foo/bar'});
+        var uri = new URI('/{domain:some}/path/to/something', {}, true);
+        uri = new URI(uri, {domain: 'foo/bar'});
         deepEqual(uri.toString(), '/foo%2Fbar/path/to/something');
+        deepEqual(uri.expand().path, ['foo/bar','path','to','something']);
+    });
+
+    it('to URI and back, no pattern', function() {
+        var uri = new URI('/{domain:some}/path/to/something', {domain: 'foo'});
+        deepEqual(uri.toString(), '/%7Bdomain%3Asome%7D/path/to/something');
+        deepEqual(uri.expand().path, ['{domain:some}','path','to','something']);
     });
 
     it('{/patterns} empty', function() {
-        var uri = new URI('/{domain:some}/path/to{/optionalPath}');
-        uri = new URI(uri);
-        uri.bind({domain: 'foo'});
+        var uri = new URI('/{domain:some}/path/to{/optionalPath}', {}, true);
+        uri = new URI(uri, {domain: 'foo'});
         deepEqual(uri.toString(), '/foo/path/to');
     });
 
     it('{/patterns} bound', function() {
-        var uri = new URI('/{domain:some}/path/to{/optionalPath}');
-        uri = new URI(uri);
-        uri.bind({optionalPath: 'foo'});
+        var uri = new URI('/{domain:some}/path/to{/optionalPath}', {}, true);
+        uri.params = {optionalPath: 'foo'};
         deepEqual(uri.toString(), '/some/path/to/foo');
     });
 
     it('{+patterns} empty', function() {
-        var uri = new URI('/{domain:some}/path/to/{+rest}');
+        var uri = new URI('/{domain:some}/path/to/{+rest}', {}, true);
         deepEqual(uri.toString(), '/some/path/to/');
     });
 
     it('{+patterns} bound', function() {
-        var uri = new URI('/{domain:some}/path/to/{+rest}');
-        uri.bind({rest: 'foo'});
+        var uri = new URI('/{domain:some}/path/to/{+rest}',
+                {rest: 'foo'}, true);
         deepEqual(uri.toString(), '/some/path/to/foo');
     });
 
     it('decoding / encoding', function() {
-        var uri = new URI('/{domain:some}/a%2Fb/to/100%/%FF', {domain: 'foo/bar'});
+        var uri = new URI('/{domain:some}/a%2Fb/to/100%/%FF', {domain: 'foo/bar'}, true);
         // Note how the invalid % encoding is fixed up to %25
         deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25/%25FF');
     });
 
     it('construct from array', function() {
-        var uri = new URI(['{domain:some}','a/b', 'to', '100%'], {domain: 'foo/bar'});
+        var uri = new URI([{
+            name: 'domain',
+            pattern: 'some'
+        },'a/b', 'to', '100%'], {domain: 'foo/bar'}, true);
         // Note how the invalid % encoding is fixed up to %25
         deepEqual(uri.toString(), '/foo%2Fbar/a%2Fb/to/100%25');
         // Try once more for caching
@@ -229,20 +323,21 @@ describe('URI', function() {
     });
 
     it('append a suffix path', function() {
-        var uri = new URI('/{domain:test.com}/v1');
-        uri.pushSuffix('/page/{title}');
-        uri.bind({title: 'foo'});
-        deepEqual(uri.toString(), '/test.com/v1/page/foo');
+        var baseURI = new URI('/{domain:test.com}/v1', {}, true);
+        var suffix = new URI('/page/{title}', {}, true);
+        var uri = new URI(baseURI.path.concat(suffix.path), {title: 'foo'});
+        deepEqual(uri.toString(), '/test.com/v1/page/foo', {}, true);
+        deepEqual(uri.expand().path, ['test.com', 'v1', 'page', 'foo']);
     });
 
     it('remove a suffix path', function() {
-        var uri = new URI('/{domain:test.com}/v1/page/{title}');
-        uri.popSuffix('/page/{title}');
+        var basePath = new URI('/{domain:test.com}/v1/page/{title}', {}, true).path;
+        var uri = new URI(basePath.slice(0, basePath.length - 2));
         deepEqual(uri.toString(), '/test.com/v1');
     });
 
     it('check for a prefix path', function() {
-        var uri = new URI('/{domain:test.com}/v1/page/{title}');
+        var uri = new URI('/{domain:test.com}/v1/page/{title}', {}, true);
         deepEqual(uri.startsWith('/test.com/v1/page'), true);
     });
 });

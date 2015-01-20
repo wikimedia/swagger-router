@@ -10,27 +10,6 @@ if (!global.Promise || !global.Promise.promisify) {
  ***/
 
 
-function normalizePath (path) {
-    if (path && path.constructor === String) {
-        // Strip a leading slash & split on remaining slashes
-        path = path.replace(/^\//, '').split(/\//);
-    } else if(!(Array.isArray(path))) {
-        throw new Error("Invalid path: " + path);
-    }
-    // Re-join {/var} patterns
-    for (var i = 0; i < path.length - 1; i++) {
-        if (/{$/.test(path[i]) && /}$/.test(path[i+1])) {
-            var rest = path[i].replace(/{$/, '');
-            if (rest.length) {
-                path.splice(i, 2, rest, '{/' + path[i+1]);
-            } else {
-                path.splice(i, 2, '{/' + path[i+1]);
-            }
-        }
-    }
-    return path;
-}
-
 
 function robustDecodeURIComponent(uri) {
     if (!/%/.test(uri)) {
@@ -46,27 +25,50 @@ function robustDecodeURIComponent(uri) {
     }
 }
 
-function parsePattern (pattern) {
-    var bits = normalizePath(pattern);
-    // Parse pattern and convert it to objects to be consumed by
-    // Node.setChild().
-    return bits.map(function(bit) {
-        // Support named but fixed values as
-        // {domain:en.wikipedia.org}
-        var m = /^{([+\/])?([a-zA-Z0-9_]+)(?::([^}]+))?}$/.exec(bit);
-        if (m) {
-///            if (m[1]) {
-///                throw new Error("Modifiers are not yet implemented: " + pattern);
-///            }
-            return {
-                modifier: m[1],
-                name: m[2],
-                pattern: robustDecodeURIComponent(m[3] || '')
-            };
-        } else {
+//               / (   {pattern} or {+pattern}                      )|( {/pattern}
+var splitRe = /(\/)(?:\{([\+])?([^:\}\/]+)(?::([^}]+))?\}|([^\/\{]*))|(?:{([\/\+]))([^:\}\/]+)(?::([^}]+))?\}/g;
+function parsePattern (pattern, isPattern) {
+    if (Array.isArray(pattern)) {
+        return pattern;
+    } else if (!isPattern) {
+        return pattern.replace(/^\//, '').split(/\//).map(function(bit) {
             return robustDecodeURIComponent(bit);
-        }
-    });
+        });
+    } else {
+        var res = [];
+        splitRe.lastIndex = 0;
+        var m;
+        do {
+            m = splitRe.exec(pattern);
+            if (m) {
+                if (m[1] === '/') {
+                    if (m[5] !== undefined) {
+                        // plain path segment
+                        res.push(robustDecodeURIComponent(m[5]));
+                    } else if (m[3]) {
+                        // templated path segment
+                        res.push({
+                            name: m[3],
+                            modifier: m[2],
+                            pattern: m[4]
+                        });
+                    }
+                } else if (m[7]) {
+                    // Optional path segment:
+                    // - {/foo} or {/foo:bar}
+                    // - {+foo}
+                    res.push({
+                        name: m[7],
+                        modifier: m[6],
+                        pattern: m[8]
+                    });
+                } else {
+                    throw new Error('The impossible happened!');
+                }
+            }
+        } while (m);
+        return res;
+    }
 }
 
 
@@ -81,52 +83,89 @@ function parsePattern (pattern) {
  *
  * @param {String|URI} uri the URI path or object to create a new URI from
  * @param {Object} params the values for variables encountered in the URI path (optional)
+ * @param {boolean} asPattern Whether to parse the URI as a pattern (optional)
+ * @return {URI} URI object. Public properties:
+ *  - `params` {object} mutable. Parameter object.
+ *  - `path` {array} immutable.
  */
-function URI(uri, params) {
-    // Public, read-only property.
-    this.path = [];
+function URI(uri, params, isPattern) {
+    this.params = params || {};
     if (uri && uri.constructor === URI) {
-        uri.path.forEach(function (item) {
-            if (item.constructor === Object) {
-                this.path.push({
-                    modifier: item.modifier,
-                    name: item.name,
-                    pattern: item.pattern
-                });
-            } else {
-                this.path.push(item);
-            }
-        }, this);
+        // this.path is considered immutable, so can be shared with other URI
+        // instances
+        this.path = uri.path;
     } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
-        this.path = parsePattern(uri);
-    }
-    this._str = null;
-    if (params) {
-        this.bind(params);
+        this.path = parsePattern(uri, isPattern);
+    } else if (uri !== '') {
+        throw new Error('Invalid path passed into URI constructor: ' + uri);
     }
 }
 
 /**
- * Binds the provided parameter values to URI's variable components
+ * Builds and returns the full, bounded string path for this URI object
  *
- * @param {Object} params the parameters (and their values) to bind
- * @return {URI} this URI object
+ * @return {String} the complete path of this URI object
+ * @param {Boolean} asPattern Whether to serialize to a pattern [optional]
+ * @return {string} URI path
  */
-URI.prototype.bind = function (params) {
-    if (!params || params.constructor !== Object) {
-        // wrong params format
-        throw new Error('Expected URI parameter object, got ' + params);
-    }
-    // look only for parameter keys which match
-    // variables in the URI
-    this.path.forEach(function (item) {
-        if(item && item.constructor === Object && params[item.name]) {
-            item.pattern = params[item.name];
-            // we have changed a value, so invalidate the string cache
-            this._str = null;
+URI.prototype.toString = function (asPattern) {
+    var uriStr = '';
+    for (var i = 0; i < this.path.length; i++) {
+        var segment = this.path[i];
+        if (segment && segment.constructor === Object) {
+            var segmentValue = this.params[segment.name];
+            if (segmentValue === undefined) {
+                segmentValue = segment.pattern;
+            }
+
+            if (segmentValue !== undefined) {
+                if (!asPattern || !segment.name) {
+                    // Normal mode
+                    uriStr += '/' + encodeURIComponent(segmentValue);
+                } else {
+                    uriStr += '/{' + (segment.modifier || '')
+                        + encodeURIComponent(segment.name) + ':'
+                        + encodeURIComponent(segmentValue) + '}';
+                }
+            } else if (asPattern) {
+                uriStr += '{' + segment.modifier
+                    + encodeURIComponent(segment.name)
+                    + '}';
+            } else {
+                if (segment.modifier === '+') {
+                    // Add trailing slash
+                    uriStr += '/';
+                }
+                // Omit optional segment & return
+                return uriStr;
+            }
+        } else {
+            uriStr += '/' + encodeURIComponent(segment);
         }
-    }, this);
-    return this;
+    }
+    return uriStr;
+};
+
+
+/**
+ * Expand all parameters in the URI and return a new URI.
+ * @return {URI}
+ */
+URI.prototype.expand = function() {
+    var res = new Array(this.path.length);
+    for (var i = 0; i < this.path.length; i++) {
+        var segment = this.path[i];
+        if (segment && segment.constructor === Object) {
+            var segmentValue = this.params[segment.name];
+            if (segmentValue === undefined) {
+                segmentValue = segment.pattern;
+            }
+            res[i] = segmentValue;
+        } else {
+            res[i] = segment;
+        }
+    }
+    return new URI(res);
 };
 
 /**
@@ -178,107 +217,13 @@ URI.prototype.startsWith = function (pathOrURI) {
     return true;
 };
 
-/**
- * Appends the specified suffix to this URI object
- *
- * @param {String|URI} pathOrURI the suffix to append
- * @return {URI} this URI object
- */
-URI.prototype.pushSuffix = function (pathOrURI) {
-    var suffix;
-    if (!pathOrURI) {
-        return this;
-    }
-    if (pathOrURI.constructor === URI) {
-        suffix = pathOrURI.path;
-    } else {
-        suffix = parsePattern(pathOrURI);
-    }
-    this.path = this.path.concat(suffix);
-    this._str = null;
-    return this;
-};
-
-/**
- * Removes the given suffix from this URI object
- *
- * @param {String|URI} pathOrURI the suffix path to remove
- * @return {URI} this URI object
- */
-URI.prototype.popSuffix = function (pathOrURI) {
-    var suffix;
-    var mySeg = this.path;
-    var currSuffixIdx, currMyIdx;
-    if (!pathOrURI) {
-        return this;
-    }
-    // get the suffix to remove
-    if (pathOrURI.constructor === URI) {
-        suffix = pathOrURI.path;
-    } else {
-        suffix = parsePattern(pathOrURI);
-    }
-    // check the compatibility of each segment
-    currSuffixIdx = suffix.length - 1;
-    currMyIdx = mySeg.length - 1;
-    while (currMyIdx >= 0 && currSuffixIdx >= 0) {
-        var myCurr = mySeg[currMyIdx];
-        var suffCurr = suffix[currSuffixIdx];
-        var remove = true;
-        if (myCurr.constructor !== Object && suffCurr.constructor !== Object) {
-            if (myCurr !== suffCurr) {
-                remove = false;
-            }
-        }
-        if (!remove) {
-            break;
-        }
-        // ok, pop the segment
-        mySeg.pop();
-        this._str = null;
-        currMyIdx--;
-        currSuffixIdx--;
-    }
-    return this;
-};
-
-/**
- * Builds and returns the full, bounded string path for this URI object
- *
- * @return {String} the complete path of this URI object
- */
-URI.prototype.toString = function () {
-    if (this._str) {
-        // there is a cached version of the URI's string
-        return this._str;
-    }
-    this._str = '';
-    this.path.forEach(function (item) {
-        if (item.constructor === Object) {
-            if (item.pattern) {
-                // there is a known value for this variable,
-                // so use it
-                this._str += '/' + encodeURIComponent(item.pattern);
-            } else if (item.modifier) {
-                // we are dealing with a modifier, and there
-                // seems to be no value, so check the modifier type
-                if (item.modifier === '+') {
-                    // we need to add a slash for a +
-                    this._str += '/';
-                }
-            } else {
-                // we have a variable component, but no value,
-                // so let's just return the variable name
-                this._str += '/{' + encodeURIComponent(item.name) + '}';
-            }
-        } else {
-            this._str += '/' + encodeURIComponent(item);
-        }
-    }, this);
-    return this._str;
-};
-
+// For JSON.stringify
 URI.prototype.toJSON = URI.prototype.toString;
+// For util.inspect, console.log & co
+URI.prototype.inspect = function () {
+    // Quote the string
+    return JSON.stringify(this.toString());
+};
 
 
 /*
@@ -286,13 +231,9 @@ URI.prototype.toJSON = URI.prototype.toString;
  *
  * We use a single monomorphic type for the JIT's benefit.
  */
-function Node (info) {
-    // Exensible info object. Public read-only property.
-    // Typical members:
-    // - spec: the original spec object (for doc purposes)
-    this.info = info || {};
+function Node (value) {
     // The value for a path ending on this node. Public property.
-    this.value = null;
+    this.value = value || null;
 
     // Internal properties.
     this._children = {};
@@ -306,14 +247,19 @@ Node.prototype.setChild = function(key, child) {
     var self = this;
     if (key.constructor === String) {
         this._children[this._keyPrefix + key] = child;
-    } else if (key.name && key.pattern && key.pattern.constructor === String) {
+    } else if (key.name && key.pattern
+            && key.modifier !== '+'
+            && key.pattern.constructor === String) {
         // A named but plain key.
         child._paramName = key.name;
         this._children[this._keyPrefix + key.pattern] = child;
+    } else if (key.modifier === '+') {
+        child._paramName = key.name;
+        this._children['**'] = child;
     } else {
         // Setting up a wildcard match
         child._paramName = key.name;
-        this._children.wildcard = child;
+        this._children['*'] = child;
     }
 };
 
@@ -323,14 +269,24 @@ Node.prototype.getChild = function(segment, params) {
         if (segment !== '') {
             var res = this._children[this._keyPrefix + segment]
                 // Fall back to the wildcard match
-                || this._children.wildcard
+                || this._children['*']
+                || this._children['**']
                 || null;
             if (res && res._paramName) {
-                params[res._paramName] = segment;
+                if (this._children['**'] === res) {
+                    // Build up an array for ** matches ({+foo})
+                    if (!Array.isArray(params[res._paramName])) {
+                        params[res._paramName] = [segment];
+                    } else {
+                        params[res._paramName].push(segment);
+                    }
+                } else {
+                    params[res._paramName] = segment;
+                }
             }
             return res;
         } else {
-            // Don't match the wildcard with an empty segment.
+            // Don't match the wildcards with an empty segment.
             return this._children[this._keyPrefix + segment];
         }
 
@@ -339,20 +295,20 @@ Node.prototype.getChild = function(segment, params) {
     } else if (segment.pattern) {
         // Unwrap the pattern
         return this.getChild(segment.pattern, params);
-    } else if (this._children.wildcard
-            && this._children.wildcard._paramName === segment.name) {
+    } else if (this._children['*']
+            && this._children['*']._paramName === segment.name) {
         // XXX: also compare modifier!
-        return this._children.wildcard || null;
+        return this._children['*'] || null;
     }
 };
 
 Node.prototype.hasChildren = function () {
-    return Object.keys(this._children).length || this._children.wildcard;
+    return Object.keys(this._children).length || this._children['*'];
 };
 
 Node.prototype.keys = function () {
     var self = this;
-    if (this._children.wildcard) {
+    if (this._children['*']) {
         return [];
     } else {
         var res = [];
@@ -384,9 +340,29 @@ Node.prototype.visitAsync = function(fn, path) {
     .then(function() {
         return Promise.resolve(Object.keys(self._children))
         .each(function(childKey) {
-            return self._children[childKey].visitAsync(fn, path.concat([childKey]));
+            var segment = childKey.replace(/^\//, '');
+            var child = self._children[childKey];
+            if (child === self) {
+                // Don't enter an infinite loop on **
+                return;
+            } else {
+                return child.visitAsync(fn, path.concat([segment]));
+            }
         });
     });
+};
+
+// Work around recursive structure in ** terminal nodes
+Node.prototype.toJSON = function () {
+    if (this._children['**'] === this) {
+        return {
+            value: this.value,
+            _children: '<recursive>',
+            _paramName: this._paramName
+        };
+    } else {
+        return this;
+    }
 };
 
 
@@ -407,8 +383,21 @@ Router.prototype._buildTree = function(path, value) {
     var node = new Node();
     if (path.length) {
         var segment = path[0];
-        var subTree = this._buildTree(path.slice(1), value);
-        node.setChild(segment, subTree);
+        if (segment.modifier === '+') {
+            // Set up a recursive match and end the traversal
+            var recursionNode = new Node();
+            recursionNode.value = value;
+            recursionNode.setChild(segment, recursionNode);
+            node.setChild(segment, recursionNode);
+        } else {
+            var subTree = this._buildTree(path.slice(1), value);
+            node.setChild(segment, subTree);
+            if (segment.modifier === '/') {
+                // Set the value for each optional path segment ({/foo})
+                node.value = value;
+                subTree.value = value;
+            }
+        }
     } else {
         node.value = value;
     }
@@ -417,9 +406,9 @@ Router.prototype._buildTree = function(path, value) {
 
 
 Router.prototype.specToTree = function (spec) {
-    var root = new Node(/*{ spec: spec }*/);
+    var root = new Node();
     for (var pathPattern in spec.paths) {
-        var path = parsePattern(pathPattern);
+        var path = parsePattern(pathPattern, true);
         this._extend(path, root, spec.paths[pathPattern]);
     }
     return root;
@@ -450,6 +439,9 @@ Router.prototype._extend = function route(path, node, value) {
         if (!nextNode || !nextNode.getChild) {
             // Found our extension point
             node.setChild(path[i], this._buildTree(path.slice(i+1), value));
+            //if (path[path.length - 1].modifier === '+') {
+            //    console.log(JSON.stringify(node, null, 2));
+            //}
             return;
         } else {
             node = nextNode;
@@ -499,8 +491,10 @@ Router.prototype._lookup = function route(path, node) {
  *  }
  */
 Router.prototype.lookup = function route(path) {
-    if (!path || path.constructor !== URI) {
-        path = normalizePath(path);
+    if (!path) {
+        throw new Error('Path expected!');
+    } else if (path.constructor === String) {
+        path = parsePattern(path);
     } else if (path.constructor === URI) {
         path = path.path;
     }
