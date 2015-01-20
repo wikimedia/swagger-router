@@ -152,13 +152,21 @@ URI.prototype.toString = function (asPattern) {
  * @return {URI}
  */
 URI.prototype.expand = function() {
-    var res = new Array(this.path.length);
+    var res = [];
     for (var i = 0; i < this.path.length; i++) {
         var segment = this.path[i];
         if (segment && segment.constructor === Object) {
             var segmentValue = this.params[segment.name];
             if (segmentValue === undefined) {
                 segmentValue = segment.pattern;
+            }
+            if (segmentValue === undefined) {
+                if (segment.modifier) {
+                    // Okay to end the URI here
+                    return new URI(res);
+                } else {
+                    throw new Error('URI.expand: parameter ' + segment.name + ' not defined!');
+                }
             }
             res[i] = segmentValue;
         } else {
