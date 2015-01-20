@@ -25,6 +25,7 @@ function robustDecodeURIComponent(uri) {
     }
 }
 
+//               / (   {pattern} or {+pattern}                      )|( {/pattern}
 var splitRe = /(\/)(?:\{([\+])?([^:\}\/]+)(?::([^}]+))?\}|([^\/\{]*))|(?:{([\/\+]))([^:\}\/]+)(?::([^}]+))?\}/g;
 function parsePattern (pattern, isPattern) {
     if (Array.isArray(pattern)) {
