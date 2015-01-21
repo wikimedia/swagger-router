@@ -361,15 +361,39 @@ Node.prototype.visitAsync = function(fn, path) {
 };
 
 // Work around recursive structure in ** terminal nodes
+function printableValue (value) {
+    var res = {};
+    if (!value || ! (value instanceof Object)) {
+        return value;
+    }
+    Object.keys(value).forEach(function(key) {
+        var val = value[key];
+        if (key === 'methods') {
+            var newMethods = {};
+            Object.keys(val).forEach(function(method) {
+                newMethods[method] = '<' + val[method].name + '>';
+            });
+            res.methods = newMethods;
+        } else {
+            res[key] = val;
+        }
+    });
+    return res;
+}
+
 Node.prototype.toJSON = function () {
     if (this._children['**'] === this) {
         return {
-            value: this.value,
+            value: printableValue(this.value),
             _children: '<recursive>',
             _paramName: this._paramName
         };
     } else {
-        return this;
+        return {
+            value: printableValue(this.value),
+            _children: this._children,
+            _paramName: this._paramName
+        };
     }
 };
 
