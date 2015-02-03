@@ -195,8 +195,19 @@ var expectations = {
     },
     '/en.wikipedia.org/v1/simple/templated/path/toolong': null,
 
-    '/en.wikipedia.org/v1/optional': null,
-    '/en.wikipedia.org/v1/optional/': null,
+    '/en.wikipedia.org/v1/optional': {
+        params: {
+            domain: 'en.wikipedia.org'
+        },
+        value: null
+    },
+    '/en.wikipedia.org/v1/optional/': {
+        params: {
+            domain: 'en.wikipedia.org',
+            _ls: ['**']
+        },
+        value: null
+    },
     '/en.wikipedia.org/v1/optional/path': {
         value: '/optional/{+path}',
         params: {

@@ -497,14 +497,14 @@ Router.prototype._lookup = function route(path, node) {
         prevNode = node;
         node = node.getChild(path[i], params);
     }
-    if (node && node.value) {
+    if (node || prevNode && path[path.length - 1] === '') {
         if (path[path.length - 1] === '') {
             // Pass in a listing
             params._ls = prevNode.keys();
         }
         return {
             params: params,
-            value: node.value
+            value: (node && node.value || null)
         };
     } else {
         return null;
