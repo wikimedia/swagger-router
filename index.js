@@ -88,14 +88,14 @@ function parsePattern (pattern, isPattern) {
  *  - `params` {object} mutable. Parameter object.
  *  - `path` {array} immutable.
  */
-function URI(uri, params, isPattern) {
+function URI(uri, params, asPattern) {
     this.params = params || {};
     if (uri && uri.constructor === URI) {
         // this.path is considered immutable, so can be shared with other URI
         // instances
         this.path = uri.path;
     } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
-        this.path = parsePattern(uri, isPattern);
+        this.path = parsePattern(uri, asPattern);
     } else if (uri !== '') {
         throw new Error('Invalid path passed into URI constructor: ' + uri);
     }
@@ -105,10 +105,10 @@ function URI(uri, params, isPattern) {
  * Builds and returns the full, bounded string path for this URI object
  *
  * @return {String} the complete path of this URI object
- * @param {Boolean} asPattern Whether to serialize to a pattern [optional]
+ * @param {string} format Either 'simplePattern' or 'fullPattern'. [optional]
  * @return {string} URI path
  */
-URI.prototype.toString = function (asPattern) {
+URI.prototype.toString = function (format) {
     var uriStr = '';
     for (var i = 0; i < this.path.length; i++) {
         var segment = this.path[i];
@@ -119,7 +119,7 @@ URI.prototype.toString = function (asPattern) {
             }
 
             if (segmentValue !== undefined) {
-                if (!asPattern || !segment.name) {
+                if (!format || format === 'simplePattern' || !segment.name) {
                     // Normal mode
                     uriStr += '/' + encodeURIComponent(segmentValue);
                 } else {
@@ -127,8 +127,10 @@ URI.prototype.toString = function (asPattern) {
                         + encodeURIComponent(segment.name) + ':'
                         + encodeURIComponent(segmentValue) + '}';
                 }
-            } else if (asPattern) {
-                uriStr += '{' + segment.modifier
+            } else if (format && !segment.modifier) {
+                uriStr += '/{' + encodeURIComponent(segment.name) + '}';
+            } else if (format) {
+                uriStr += '{' + (segment.modifier || '')
                     + encodeURIComponent(segment.name)
                     + '}';
             } else {

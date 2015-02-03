@@ -336,6 +336,13 @@ describe('URI', function() {
         deepEqual(uri.toString(), '/test.com/v1');
     });
 
+    it('should serialize with "simplePattern" and "fullPattern" formats', function() {
+        var uri = new URI('/{domain:test.com}/v1/{title}{/foo}{+bar}', {}, true);
+        deepEqual(uri.toString(), '/test.com/v1');
+        deepEqual(uri.toString('simplePattern'), '/test.com/v1/{title}{/foo}{+bar}');
+        deepEqual(uri.toString('fullPattern'), '/{domain:test.com}/v1/{title}{/foo}{+bar}');
+    });
+
     it('check for a prefix path', function() {
         var uri = new URI('/{domain:test.com}/v1/page/{title}', {}, true);
         deepEqual(uri.startsWith('/test.com/v1/page'), true);
