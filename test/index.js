@@ -204,7 +204,7 @@ var expectations = {
     '/en.wikipedia.org/v1/optional/': {
         params: {
             domain: 'en.wikipedia.org',
-            _ls: ['**']
+            _ls: []
         },
         value: null
     },
