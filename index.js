@@ -27,49 +27,62 @@ function robustDecodeURIComponent(uri) {
 
 //               / (   {pattern} or {+pattern}                      )|( {/pattern}
 var splitRe = /(\/)(?:\{([\+])?([^:\}\/]+)(?::([^}]+))?\}|([^\/\{]*))|(?:{([\/\+]))([^:\}\/]+)(?::([^}]+))?\}/g;
-function parsePattern (pattern, isPattern) {
-    if (Array.isArray(pattern)) {
-        return pattern;
-    } else if (!isPattern) {
-        return pattern.replace(/^\//, '').split(/\//).map(function(bit) {
-            return robustDecodeURIComponent(bit);
-        });
-    } else {
-        var res = [];
-        splitRe.lastIndex = 0;
-        var m;
-        do {
-            m = splitRe.exec(pattern);
-            if (m) {
-                if (m[1] === '/') {
-                    if (m[5] !== undefined) {
-                        // plain path segment
-                        res.push(robustDecodeURIComponent(m[5]));
-                    } else if (m[3]) {
-                        // templated path segment
-                        res.push({
-                            name: m[3],
-                            modifier: m[2],
-                            pattern: m[4]
-                        });
-                    }
-                } else if (m[7]) {
-                    // Optional path segment:
-                    // - {/foo} or {/foo:bar}
-                    // - {+foo}
+function parsePattern (pattern) {
+    var res = [];
+    splitRe.lastIndex = 0;
+    var m;
+    do {
+        m = splitRe.exec(pattern);
+        if (m) {
+            if (m[1] === '/') {
+                if (m[5] !== undefined) {
+                    // plain path segment
+                    res.push(robustDecodeURIComponent(m[5]));
+                } else if (m[3]) {
+                    // templated path segment
                     res.push({
-                        name: m[7],
-                        modifier: m[6],
-                        pattern: m[8]
+                        name: m[3],
+                        modifier: m[2],
+                        pattern: m[4]
                     });
-                } else {
-                    throw new Error('The impossible happened!');
                 }
+            } else if (m[7]) {
+                // Optional path segment:
+                // - {/foo} or {/foo:bar}
+                // - {+foo}
+                res.push({
+                    name: m[7],
+                    modifier: m[6],
+                    pattern: m[8]
+                });
+            } else {
+                throw new Error('The impossible happened!');
             }
-        } while (m);
-        return res;
+        }
+    } while (m);
+    return res;
+}
+
+// Parse a path or pattern
+function parsePath (path, isPattern) {
+    if (Array.isArray(path)) {
+        return path;
+    } else if (!isPattern) {
+        var bits = path.replace(/^\//, '').split(/\//);
+        if (!/%/.test(path)) {
+            // fast path
+            return bits;
+        } else {
+            return bits.map(function(bit) {
+                return robustDecodeURIComponent(bit);
+            });
+        }
+    } else {
+        return parsePattern(path);
     }
 }
+
+
 
 
 /***
@@ -95,7 +108,7 @@ function URI(uri, params, asPattern) {
         // instances
         this.path = uri.path;
     } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
-        this.path = parsePattern(uri, asPattern);
+        this.path = parsePath(uri, asPattern);
     } else if (uri !== '') {
         throw new Error('Invalid path passed into URI constructor: ' + uri);
     }
@@ -154,20 +167,24 @@ URI.prototype.toString = function (format) {
  * @return {URI}
  */
 URI.prototype.expand = function() {
-    var res = [];
+    var res = new Array(this.path.length);
     for (var i = 0; i < this.path.length; i++) {
         var segment = this.path[i];
         if (segment && segment.constructor === Object) {
             var segmentValue = this.params[segment.name];
             if (segmentValue === undefined) {
                 segmentValue = segment.pattern;
-            }
-            if (segmentValue === undefined) {
-                if (segment.modifier) {
-                    // Okay to end the URI here
-                    return new URI(res);
-                } else {
-                    throw new Error('URI.expand: parameter ' + segment.name + ' not defined!');
+                if (segmentValue === undefined) {
+                    if (segment.modifier) {
+                        // Okay to end the URI here
+                        // Pop over-allocated entries
+                        while (res[res.length - 1] === undefined) {
+                            res.pop();
+                        }
+                        return new URI(res);
+                    } else {
+                        throw new Error('URI.expand: parameter ' + segment.name + ' not defined!');
+                    }
                 }
             }
             res[i] = segmentValue;
@@ -248,6 +265,7 @@ function Node (value) {
     // Internal properties.
     this._children = {};
     this._paramName = null;
+    this._parent = null;
 }
 
 Node.prototype._keyPrefix = '/';
@@ -276,28 +294,33 @@ Node.prototype.setChild = function(key, child) {
 Node.prototype.getChild = function(segment, params) {
     if (segment.constructor === String) {
         // Fast path
-        if (segment !== '') {
-            var res = this._children[this._keyPrefix + segment]
-                // Fall back to the wildcard match
-                || this._children['*']
-                || this._children['**']
-                || null;
-            if (res && res._paramName) {
-                if (this._children['**'] === res) {
+        var res = this._children[this._keyPrefix + segment];
+        if (!res) {
+            if (segment !== '') {
+                // Fall back to the wildcard match, but only if the segment is
+                // non-empty.
+                res = this._children['*'];
+                if (!res && this._children['**']) {
+                    res = this._children['**'];
                     // Build up an array for ** matches ({+foo})
                     if (!Array.isArray(params[res._paramName])) {
                         params[res._paramName] = [segment];
                     } else {
                         params[res._paramName].push(segment);
                     }
-                } else {
-                    params[res._paramName] = segment;
+                    // We are done.
+                    return res;
                 }
+            }
+        }
+
+        if (res) {
+            if (res._paramName) {
+                params[res._paramName] = segment;
             }
             return res;
         } else {
-            // Don't match the wildcards with an empty segment.
-            return this._children[this._keyPrefix + segment];
+            return null;
         }
 
     // Fall-back cases for internal use during tree construction. These cases
@@ -318,7 +341,7 @@ Node.prototype.hasChildren = function () {
 
 Node.prototype.keys = function () {
     var self = this;
-    if (this._children['*']) {
+    if (this._children['*'] || this._children['**']) {
         return [];
     } else {
         var res = [];
@@ -442,7 +465,7 @@ Router.prototype._buildTree = function(path, value) {
 Router.prototype.specToTree = function (spec) {
     var root = new Node();
     for (var pathPattern in spec.paths) {
-        var path = parsePattern(pathPattern, true);
+        var path = parsePath(pathPattern, true);
         this._extend(path, root, spec.paths[pathPattern]);
     }
     return root;
@@ -528,7 +551,7 @@ Router.prototype.lookup = function route(path) {
     if (!path) {
         throw new Error('Path expected!');
     } else if (path.constructor === String) {
-        path = parsePattern(path);
+        path = parsePath(path);
     } else if (path.constructor === URI) {
         path = path.path;
     }
