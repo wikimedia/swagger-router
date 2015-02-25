@@ -1,8 +1,6 @@
 "use strict";
 
-if (!global.Promise || !global.Promise.promisify) {
-    global.Promise = require('bluebird');
-}
+var P = require('bluebird');
 
 /***
  * :SECTION 1:
@@ -371,7 +369,7 @@ Node.prototype.visitAsync = function(fn, path) {
     // First value, then each of the children (one by one)
     return fn(self.value, path)
     .then(function() {
-        return Promise.resolve(Object.keys(self._children))
+        return P.resolve(Object.keys(self._children))
         .each(function(childKey) {
             var segment = childKey.replace(/^\//, '');
             var child = self._children[childKey];
