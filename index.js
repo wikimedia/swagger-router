@@ -203,12 +203,15 @@ URI.prototype.expand = function(params) {
                     }
                 }
             }
-            res[i] = segmentValue;
+            res[i] = segmentValue + ''; // coerce segments to string
         } else {
             res[i] = segment;
         }
     }
-    return new URI(res);
+    var uri = new URI(res);
+    // FIXME: handle this in the constructor!
+    uri.urlObj = this.urlObj;
+    return uri;
 };
 
 /**
