@@ -305,6 +305,11 @@ describe('URI', function() {
         deepEqual(uri.toString(), '/some/path/to/foo');
     });
 
+    it('{/patterns} dynamic expand', function() {
+        var uri = new URI('/{domain:some}/path/to{/optionalPath}', {}, true);
+        deepEqual(uri.expand({optionalPath: 'foo'}).toString(), '/some/path/to/foo');
+    });
+
     it('{+patterns} empty', function() {
         var uri = new URI('/{domain:some}/path/to/{+rest}', {}, true);
         deepEqual(uri.toString(), '/some/path/to/');
@@ -314,6 +319,11 @@ describe('URI', function() {
         var uri = new URI('/{domain:some}/path/to/{+rest}',
                 {rest: 'foo'}, true);
         deepEqual(uri.toString(), '/some/path/to/foo');
+    });
+
+    it('{+patterns} dynamic expand', function() {
+        var uri = new URI('/{domain:some}/path/to/{+rest}',{}, true);
+        deepEqual(uri.expand({rest: 'foo'}).toString(), '/some/path/to/foo');
     });
 
     it('decoding / encoding', function() {
@@ -357,5 +367,19 @@ describe('URI', function() {
     it('check for a prefix path', function() {
         var uri = new URI('/{domain:test.com}/v1/page/{title}', {}, true);
         deepEqual(uri.startsWith('/test.com/v1/page'), true);
+    });
+
+    it('handle protocols', function() {
+        var uri = new URI('https://test.com/v1/page/title');
+        deepEqual(uri.urlObj.protocol, 'https:');
+        deepEqual(uri.path[0], 'v1');
+        deepEqual(uri.toString(), 'https://test.com/v1/page/title');
+    });
+
+    it('handle protocols & patterns', function() {
+        var uri = new URI('https://test.com/v1/page/{title}',
+                {title: 'testTitle'}, true);
+        deepEqual(uri.startsWith('/v1/page'), true);
+        deepEqual(uri.toString(), 'https://test.com/v1/page/testTitle');
     });
 });

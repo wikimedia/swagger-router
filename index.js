@@ -1,6 +1,7 @@
 "use strict";
 
 var P = require('bluebird');
+var url = require('url');
 
 /***
  * :SECTION 1:
@@ -101,11 +102,22 @@ function parsePath (path, isPattern) {
  */
 function URI(uri, params, asPattern) {
     this.params = params || {};
+    this.urlObj = null;
     if (uri && uri.constructor === URI) {
+        this.urlObj = uri.urlObj;
         // this.path is considered immutable, so can be shared with other URI
         // instances
         this.path = uri.path;
     } else if (uri && (uri.constructor === String || Array.isArray(uri))) {
+        if (uri.constructor === String) {
+            if (/^[^\/]+:/.test(uri)) {
+                this.urlObj = url.parse(uri);
+                // Work around encoding difference for {} between node 0.10 &
+                // 0.12 / iojs. 0.10 leaves those chars as they are in .path,
+                // newer node versions percent-encode them.
+                uri = uri.substr(this.urlObj.resolve('/').length - 1);
+            }
+        }
         this.path = parsePath(uri, asPattern);
     } else if (uri !== '') {
         throw new Error('Invalid path passed into URI constructor: ' + uri);
@@ -120,7 +132,8 @@ function URI(uri, params, asPattern) {
  * @return {string} URI path
  */
 URI.prototype.toString = function (format) {
-    var uriStr = '';
+    var uriStr = this.urlObj && this.urlObj.resolve('/').replace(/\/$/,'')
+                || '';
     for (var i = 0; i < this.path.length; i++) {
         var segment = this.path[i];
         if (segment && segment.constructor === Object) {
@@ -162,14 +175,19 @@ URI.prototype.toString = function (format) {
 
 /**
  * Expand all parameters in the URI and return a new URI.
+ * @param {object} params (optional) Parameters to use for expansion. Uses
+ * URI-assigned parameters if not supplied.
  * @return {URI}
  */
-URI.prototype.expand = function() {
+URI.prototype.expand = function(params) {
+    if (!params) {
+        params = this.params;
+    }
     var res = new Array(this.path.length);
     for (var i = 0; i < this.path.length; i++) {
         var segment = this.path[i];
         if (segment && segment.constructor === Object) {
-            var segmentValue = this.params[segment.name];
+            var segmentValue = params[segment.name];
             if (segmentValue === undefined) {
                 segmentValue = segment.pattern;
                 if (segmentValue === undefined) {
