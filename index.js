@@ -128,32 +128,44 @@ function URI(uri, params, asPattern) {
  * Builds and returns the full, bounded string path for this URI object
  *
  * @return {String} the complete path of this URI object
- * @param {string} format Either 'simplePattern' or 'fullPattern'. [optional]
+ * @param {object} options {
+ *      format {string} Either 'simplePattern' or 'fullPattern'. [optional]
+ *      params {object} parameters to use during serialization
+ * }
  * @return {string} URI path
  */
-URI.prototype.toString = function (format) {
+URI.prototype.toString = function (options) {
+    // b/c
+    if (!options || options.constructor === String) {
+        options = { format: options };
+    }
+    var params = options.params || this.params;
     var uriStr = this.urlObj && this.urlObj.resolve('/').replace(/\/$/,'')
                 || '';
     for (var i = 0; i < this.path.length; i++) {
         var segment = this.path[i];
         if (segment && segment.constructor === Object) {
-            var segmentValue = this.params[segment.name];
+            var segmentValue = params[segment.name];
             if (segmentValue === undefined) {
                 segmentValue = segment.pattern;
             }
 
             if (segmentValue !== undefined) {
-                if (!format || format === 'simplePattern' || !segment.name) {
-                    // Normal mode
-                    uriStr += '/' + encodeURIComponent(segmentValue);
+                if (!options.format || options.format === 'simplePattern' || !segment.name) {
+                    if (segment.modifier === '+') {
+                        uriStr += '/' + segmentValue;
+                    } else {
+                        // Normal mode
+                        uriStr += '/' + encodeURIComponent(segmentValue);
+                    }
                 } else {
                     uriStr += '/{' + (segment.modifier || '')
                         + encodeURIComponent(segment.name) + ':'
                         + encodeURIComponent(segmentValue) + '}';
                 }
-            } else if (format && !segment.modifier) {
+            } else if (options.format && !segment.modifier) {
                 uriStr += '/{' + encodeURIComponent(segment.name) + '}';
-            } else if (format) {
+            } else if (options.format) {
                 uriStr += '{' + (segment.modifier || '')
                     + encodeURIComponent(segment.name)
                     + '}';
