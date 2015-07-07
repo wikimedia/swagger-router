@@ -45,21 +45,24 @@ var expectations = {
         value: '/page',
         params: {
             domain: 'en.wikipedia.org'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/page/': {
         value: '/page/',
         params: {
             _ls: [],
             domain: 'en.wikipedia.org'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/page/Foo': {
         value: '/page/{title}',
         params: {
             domain: 'en.wikipedia.org',
             title: 'Foo'
-        }
+        },
+        permissions: []
     },
     // static listing of available formats
     '/en.wikipedia.org/v1/page/Foo/': {
@@ -68,21 +71,24 @@ var expectations = {
             _ls: ['data-parsoid','html'],
             domain: 'en.wikipedia.org',
             title: 'Foo'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/page/Foo/html': {
         value: '/page/{title}/html',
         params: {
             domain: 'en.wikipedia.org',
             title: 'Foo'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/transform/html/to/wikitext': {
         value: '/transform/html/to/{format}',
         params: {
             domain: 'en.wikipedia.org',
             format: 'wikitext'
-        }
+        },
+        permissions: []
     },
     // static listing
     '/en.wikipedia.org/v1/transform/': {
@@ -90,7 +96,8 @@ var expectations = {
         params: {
             _ls: ['html','wikitext'],
             domain: 'en.wikipedia.org'
-        }
+        },
+        permissions: []
     },
     // static listing, another wiki
     '/de.wikipedia.org/v1/transform/': {
@@ -98,7 +105,8 @@ var expectations = {
         params: {
             _ls: ['html','wikitext'],
             domain: 'de.wikipedia.org'
-        }
+        },
+        permissions: []
     },
 
     // double slashes
@@ -107,26 +115,30 @@ var expectations = {
         params: {
             _ls: [''],
             domain: 'en.wikipedia.org'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/double//': {
         value: '/double//',
         params: {
             _ls: ['slash'],
             domain: 'en.wikipedia.org'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/double//slash': {
         value: '/double//slash',
         params: {
             domain: 'en.wikipedia.org'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/some/really/long/path': {
         value: '/some/really/long/path',
         params: {
             domain: 'en.wikipedia.org'
-        }
+        },
+        permissions: []
     },
 
     // Optional path segments
@@ -134,14 +146,16 @@ var expectations = {
         value: '/several{/optional}{/path}{+segments}',
         params: {
             domain: 'en.wikipedia.org'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/several/optional': {
         value: '/several{/optional}{/path}{+segments}',
         params: {
             domain: 'en.wikipedia.org',
             optional: 'optional'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/several/optional/path': {
         value: '/several{/optional}{/path}{+segments}',
@@ -149,7 +163,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             optional: 'optional',
             path: 'path'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/several/optional/path/segments': {
         value: '/several{/optional}{/path}{+segments}',
@@ -158,7 +173,8 @@ var expectations = {
             optional: 'optional',
             path: 'path',
             segments: ['segments'],
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/several/optional/path/segments/a': {
         value: '/several{/optional}{/path}{+segments}',
@@ -167,7 +183,8 @@ var expectations = {
             optional: 'optional',
             path: 'path',
             segments: ['segments','a'],
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/several/optional/path/segments/a/b': {
         value: '/several{/optional}{/path}{+segments}',
@@ -176,14 +193,16 @@ var expectations = {
             optional: 'optional',
             path: 'path',
             segments: ['segments','a','b'],
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/simple/templated': {
         value: '/simple/{templated}{/path}',
         params: {
             domain: 'en.wikipedia.org',
             templated: 'templated'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/simple/templated/path': {
         value: '/simple/{templated}{/path}',
@@ -191,7 +210,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             templated: 'templated',
             path: 'path'
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/simple/templated/path/toolong': null,
 
@@ -199,28 +219,32 @@ var expectations = {
         params: {
             domain: 'en.wikipedia.org'
         },
-        value: null
+        value: null,
+        permissions: []
     },
     '/en.wikipedia.org/v1/optional/': {
         params: {
             domain: 'en.wikipedia.org',
             _ls: []
         },
-        value: null
+        value: null,
+        permissions: []
     },
     '/en.wikipedia.org/v1/optional/path': {
         value: '/optional/{+path}',
         params: {
             domain: 'en.wikipedia.org',
             path: ['path']
-        }
+        },
+        permissions: []
     },
     '/en.wikipedia.org/v1/optional/path/bits': {
         value: '/optional/{+path}',
         params: {
             domain: 'en.wikipedia.org',
             path: ['path','bits']
-        }
+        },
+        permissions: []
     },
 
     // A few paths that should not match

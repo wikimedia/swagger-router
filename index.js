@@ -544,11 +544,15 @@ Router.prototype._extend = function route(path, node, value) {
 Router.prototype._lookup = function route(path, node) {
     var params = {};
     var prevNode;
+    var permissions = [];
     for (var i = 0; i < path.length; i++) {
         if (!node || !node.getChild) {
             return null;
         }
         prevNode = node;
+        if (node.value && node.value.security) {
+            permissions = permissions.concat(node.value.security);
+        }
         node = node.getChild(path[i], params);
     }
     if (node || prevNode && path[path.length - 1] === '') {
@@ -558,7 +562,8 @@ Router.prototype._lookup = function route(path, node) {
         }
         return {
             params: params,
-            value: (node && node.value || null)
+            value: (node && node.value || null),
+            permissions: permissions
         };
     } else {
         return null;
@@ -575,7 +580,8 @@ Router.prototype._lookup = function route(path, node) {
  *    params: {
  *      someParam: 'pathcomponent'
  *    },
- *    value: theValue
+ *    value: theValue,
+ *    permissions: [somePermission]
  *  }
  */
 Router.prototype.lookup = function route(path) {
@@ -590,7 +596,8 @@ Router.prototype.lookup = function route(path) {
     if (res) {
         return {
             params: res.params,
-            value: res.value
+            value: res.value,
+            permissions: res.permissions
         };
     } else {
         return res;
