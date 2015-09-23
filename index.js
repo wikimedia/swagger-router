@@ -555,6 +555,11 @@ Router.prototype._lookup = function route(path, node) {
         }
         node = node.getChild(path[i], params);
     }
+
+    if (node && node.value && node.value.security) {
+        permissions = permissions.concat(node.value.security);
+    }
+
     if (node || prevNode && path[path.length - 1] === '') {
         if (path[path.length - 1] === '') {
             // Pass in a listing
