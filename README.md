@@ -68,3 +68,42 @@ router.lookup(['']); // equivalent: router.lookup('/');
 */
 
 ```
+
+## Request templating
+
+Module exports an efficient templating library under `Template` class.
+
+Example usage:
+```javascript
+var template = new Template({
+    method: 'put',
+    uri: '/{domain}/{$.request.headers.location}',
+    headers: '{$$.merge($.request.headers, {"additional_name": "additional_value"})}'
+    body: {
+        field_from_req_body: '{field_name}',
+        global_reference: '{$.request.headers.header_name}',
+        field_with_default_value: '{$$.default($.request.params.param_name, "defaultValue")}'       
+    }
+});
+var request = template.expand({
+    request: req,
+    additional_context: context
+});
+```
+
+Expressions wrapped in curly braces are considered templates, which are resolved to values
+on template expansion. In case some value cannot be resolved, template is expanded to `undefined`.
+
+`$` references global context (object, passed to the `expand` method). It can contain arbitrary number of objects,
+but it must at least contain a `request` property with an original request. 
+
+Short notations are supported, which are resolved to fields of a request part, for example, 
+`'{field_name}'` in template `body` would be resolved to `'{$.request.body.field_name}'`. 
+Short notations in `uri` would be resolved to `$.request.params`.
+
+Braced syntax is supported, so it's possible to write templates like `'{$.request.body[$.request.params.some_field]}'`.
+
+Several utility methods are supported:
+- `$$.default(template, defaultValue)` - if `template` is resolved, use it's value, otherwise use `defaultValue`.
+- `$$.merge(template1, template2)` - both templates should be evaluated to objects. The result is an object
+   with merged properties, but without overriding.
