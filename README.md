@@ -74,7 +74,7 @@ router.lookup(['']); // equivalent: router.lookup('/');
 Module exports an efficient templating library under `Template` class.
 
 Example usage:
-```
+```javascript
 var template = new Template({
     method: 'put',
     uri: '/{domain}/{$.request.headers.location}',
