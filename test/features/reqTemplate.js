@@ -157,13 +157,21 @@ describe('Request template', function() {
             request: {
                 params: {
                     domain: 'en.wikipedia.org',
-                    path: 'test1/test2/test3'
+                    path: [
+                        'test1',
+                        'test2',
+                        'test3'
+                    ]
                 }
             }
         });
         assert.deepEqual(result.uri,
         new URI('http://en.wikipedia.org/path1/{+path}', {}, true).expand({
-            path: 'test1/test2/test3'
+            path: [
+                'test1',
+                'test2',
+                'test3'
+            ]
         }));
     });
 

@@ -53,6 +53,11 @@ describe('URI', function() {
         deepEqual(uri.expand({rest: 'foo'}).toString(), '/some/path/to/foo');
     });
 
+    it('{+patterns} dynamic expand with array', function() {
+        var uri = new URI('/{domain:some}/path/to/{+rest}',{}, true);
+        deepEqual(uri.expand({rest: ['foo', 'bar']}).toString(), '/some/path/to/foo/bar');
+    });
+
     it('decoding / encoding', function() {
         var uri = new URI('/{domain:some}/a%2Fb/to/100%/%FF', {domain: 'foo/bar'}, true);
         // Note how the invalid % encoding is fixed up to %25
