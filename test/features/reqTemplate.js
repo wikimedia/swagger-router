@@ -255,4 +255,56 @@ describe('Request template', function() {
             extra: 'extra'
         });
     });
+
+    it('should support string templates', function() {
+        var template = new Template('{$.request}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'value'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, request);
+    });
+
+    it('should support short notation in string templates', function() {
+        var template = new Template('{request}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'value'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, request);
+    });
+
+    it('should support short nested notation in string templates', function() {
+        var template = new Template('{request.method}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'value'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, 'get');
+    });
+
+    it('should support short nested notation with brackets in string templates', function() {
+        var template = new Template('{request[$.request.body.field]}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, 'get');
+    });
 });
