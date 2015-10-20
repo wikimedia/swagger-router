@@ -166,7 +166,7 @@ var expectations = {
             domain: 'en.wikipedia.org',
             optional: 'optional',
             path: 'path',
-            segments: ['segments'],
+            segments: 'segments',
         },
         permissions: []
     },
@@ -176,7 +176,7 @@ var expectations = {
             domain: 'en.wikipedia.org',
             optional: 'optional',
             path: 'path',
-            segments: ['segments','a'],
+            segments: 'segments/a',
         },
         permissions: []
     },
@@ -186,7 +186,7 @@ var expectations = {
             domain: 'en.wikipedia.org',
             optional: 'optional',
             path: 'path',
-            segments: ['segments','a','b'],
+            segments: 'segments/a/b',
         },
         permissions: []
     },
@@ -228,7 +228,7 @@ var expectations = {
         value: '/optional/{+path}',
         params: {
             domain: 'en.wikipedia.org',
-            path: ['path']
+            path: 'path'
         },
         permissions: []
     },
@@ -236,7 +236,7 @@ var expectations = {
         value: '/optional/{+path}',
         params: {
             domain: 'en.wikipedia.org',
-            path: ['path','bits']
+            path: 'path/bits'
         },
         permissions: []
     },
