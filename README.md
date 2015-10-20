@@ -1,6 +1,6 @@
 # Swagger 2 router
 [![Build
-Status](https://travis-ci.org/gwicke/swagger-router.svg?branch=master)](https://travis-ci.org/gwicke/swagger-router)
+Status](https://travis-ci.org/wikimedia/swagger-router.svg?branch=master)](https://travis-ci.org/wikimedia/swagger-router)
 
 ## Features
 - `O(path element)` lookup complexity, monomorphic design with simple fast path.
@@ -68,6 +68,25 @@ router.lookup(['']); // equivalent: router.lookup('/');
 */
 
 ```
+## URI templating
+
+URIs are represented by `URI` class, which supports a limited set of features
+from [URI Template RFC 6570](http://tools.ietf.org/html/rfc6570). 
+
+### Supported URI template expressions:
+- Simple string expression `{pattern}` - on expansion, looks up a variable named `pattern` in params
+  and substitutes its pct-encoded value. On matching, matches a single element in the path, and
+  sets `params.pattern` to the path element value. 
+- Restricted expression `{+pattern}` - on expansion, works the same way as simple expression, but doesn't
+  pct-encode [reserved characters](http://tools.ietf.org/html/rfc3986#section-2.2) and ptc-triplets.
+  On matching, matches the whole subpath and writes it's value to `params.pattern` variable.
+- Optional expression `{/pattern}` - works the same way as simple expression, but on matching the path 
+  element is optional.
+- Fixed expression `{pattern:value}` - on matching, matches only uris with path element equal to `value`,
+  and exports `value` as `params.pattern` variable. On expansion, substitutes `value`.
+
+These features are optimised and available with `URI.expand(params)` method. Additional features
+are available with request templating.
 
 ## Request templating
 

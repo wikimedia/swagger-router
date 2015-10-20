@@ -55,7 +55,17 @@ describe('URI', function() {
 
     it('{+patterns} dynamic expand with array', function() {
         var uri = new URI('/{domain:some}/path/to/{+rest}',{}, true);
-        deepEqual(uri.expand({rest: ['foo', 'bar']}).toString(), '/some/path/to/foo/bar');
+        deepEqual(uri.expand({rest: ['foo', 'bar']}).toString(), '/some/path/to/foo,bar');
+    });
+
+    it('{+patterns} dynamic expand with subpath', function() {
+        var uri = new URI('/{domain:some}/path/to/{+rest}',{}, true);
+        deepEqual(uri.expand({rest: 'foo/bar'}).toString(), '/some/path/to/foo/bar');
+    });
+
+    it('{+patterns} dynamic expand with reserved chars', function() {
+        var uri = new URI('/{domain:some}/path/to/{+rest}',{}, true);
+        deepEqual(uri.expand({rest: 'foo$bar/bar?test#a=$'}).toString(), '/some/path/to/foo$bar/bar?test#a=$');
     });
 
     it('decoding / encoding', function() {
