@@ -73,7 +73,7 @@ router.lookup(['']); // equivalent: router.lookup('/');
 URIs are represented by `URI` class, which supports a limited set of features
 from [URI Template RFC 6570](http://tools.ietf.org/html/rfc6570). 
 
-# Supported URI template expressions:
+### Supported URI template expressions:
 - Simple string expression `{pattern}` - on expansion, looks up a variable named `pattern` in params
   and substitutes its pct-encoded value. On matching, matches a single element in the path, and
   sets `params.pattern` to the path element value. 
