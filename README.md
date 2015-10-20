@@ -1,6 +1,6 @@
 # Swagger 2 router
 [![Build
-Status](https://travis-ci.org/gwicke/swagger-router.svg?branch=master)](https://travis-ci.org/gwicke/swagger-router)
+Status](https://travis-ci.org/wikimedia/swagger-router.svg?branch=master)](https://travis-ci.org/wikimedia/swagger-router)
 
 ## Features
 - `O(path element)` lookup complexity, monomorphic design with simple fast path.
