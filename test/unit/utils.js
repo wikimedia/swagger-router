@@ -8,7 +8,7 @@ var utils = require('../../lib/utils');
 
 describe('utils tests', function() {
     it('should correctly encode reserved expansion', function() {
-        deepEqual(utils.encodeReserved('ä:/?#[]@!$&\'()*+,;=%2f'),
-            '%C3%A4:/?#[]@!$&\'()*+,;=/');
+        deepEqual(utils.encodeReserved('ä:/?#[]@!$&\'()*+,;=%2f%20'),
+            '%C3%A4:/?#[]@!$&\'()*+,;=%2f%20');
     });
 });
