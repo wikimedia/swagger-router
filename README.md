@@ -126,3 +126,5 @@ Several utility methods are supported:
 - `$$.default(template, defaultValue)` - if `template` is resolved, use it's value, otherwise use `defaultValue`.
 - `$$.merge(template1, template2)` - both templates should be evaluated to objects. The result is an object
    with merged properties, but without overriding.
+- `$$.strip(object, properties)` - removes field names listed in `properties` array from an `object`. `properties`
+   could also be a string, if a single field should be removed.

@@ -315,4 +315,31 @@ describe('Request template', function() {
         var result = template.expand({ request: request });
         assert.deepEqual(result, 'get');
     });
+
+    it('should strip the object', function() {
+        var template = new Template({
+            method: 'get',
+            uri: 'test.com',
+            headers: '{$$.strip($.request.headers, "removed_header")}',
+            body: '{$$.strip($.request.body, ["removed_field1", "removed_field2"])}'
+        });
+        var result = template.expand({
+            request: {
+                headers: {
+                    not_removed_header: 'value',
+                    removed_header: 'value'
+                },
+                body: {
+                    not_removed_field: 'value',
+                    removed_field1: 'value',
+                    removed_field2: 'value'
+                }
+            }
+        });
+        assert.deepEqual(result.headers.not_removed_header, 'value');
+        assert.deepEqual(result.headers.removed_header, undefined);
+        assert.deepEqual(result.body.not_removed_field, 'value');
+        assert.deepEqual(result.body.removed_field1, undefined);
+        assert.deepEqual(result.body.removed_field2, undefined);
+    });
 });
