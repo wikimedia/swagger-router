@@ -190,6 +190,26 @@ var expectations = {
         },
         permissions: []
     },
+    '/en.wikipedia.org/v1/several/optional/path/a%2fb': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path',
+            segments: 'a%2Fb',
+        },
+        permissions: []
+    },
+    '/en.wikipedia.org/v1/several/optional/path/segments/a%2fb': {
+        value: '/several{/optional}{/path}{+segments}',
+        params: {
+            domain: 'en.wikipedia.org',
+            optional: 'optional',
+            path: 'path',
+            segments: 'segments/a%2Fb',
+        },
+        permissions: []
+    },
     '/en.wikipedia.org/v1/simple/templated': {
         value: '/simple/{templated}{/path}',
         params: {
