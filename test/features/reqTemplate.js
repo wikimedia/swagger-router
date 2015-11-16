@@ -362,4 +362,35 @@ describe('Request template', function() {
         assert.deepEqual(result.body.removed_field1, undefined);
         assert.deepEqual(result.body.removed_field2, undefined);
     });
+
+    /**
+     * New-style un-prefixed globals & calls
+     */
+
+    it('should support un-prefixed dotted paths & the global accessor', function() {
+        var template = new Template('{request[request.body.field]}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, 'get');
+    });
+
+    it('should support un-prefixed calls', function() {
+        var template = new Template('{default(request.foo, request[request.body.field])}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, 'get');
+    });
+
 });
