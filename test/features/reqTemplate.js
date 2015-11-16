@@ -393,4 +393,49 @@ describe('Request template', function() {
         assert.deepEqual(result, 'get');
     });
 
+    it('should support double brace syntax', function() {
+        var template = new Template('{{default(request.foo, request[request.body.field])}}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, 'get');
+    });
+
+    it('should support double brace syntax in uri as well', function() {
+        var template = new Template({
+            uri: '{{options.host}}/{foo}/',
+            headers: {
+                bar: '{{bar}}',
+                baz: '{baz}',
+            }
+        });
+        var request = {
+            method: 'get',
+            headers: {
+                bar: 'a/bar',
+                baz: 'a/baz',
+            },
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            },
+            params: {
+                foo: 'a/foo',
+            }
+        };
+        var result = template.expand({ request: request, options: { host: '/a/host' } });
+        assert.deepEqual(result, {
+            uri: '/a/host/a%2Ffoo/',
+            headers: {
+                bar: 'a/bar',
+                // FIXME: This will change in the future!
+                baz: 'a/baz',
+            }
+        });
+    });
 });
