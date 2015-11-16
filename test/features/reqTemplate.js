@@ -103,7 +103,7 @@ describe('Request template', function() {
                 field: 'additional_test_value'
             }
         });
-        assert.deepEqual(result, expectedTemplatedRequest);
+        assert.deepEqual(result + '', expectedTemplatedRequest + '');
     });
 
     it('should encode uri components', function() {
@@ -118,10 +118,10 @@ describe('Request template', function() {
                 }
             }
         });
-        assert.deepEqual(result.uri,
+        assert.deepEqual(result.uri.toString(),
         new URI('http://en.wikipedia.org/path1/{path2}', {}, true).expand({
             path2: 'test1/test2/test3'
-        }));
+        }).toString());
     });
 
     it('should support optional path elements in uri template', function() {
@@ -135,7 +135,8 @@ describe('Request template', function() {
                 }
             }
         });
-        assert.deepEqual(resultNoOptional.uri, new URI('/en.wikipedia.org/path1{/optional}', {}, true).expand());
+        assert.deepEqual(resultNoOptional.uri.toString(),
+                new URI('/en.wikipedia.org/path1{/optional}', {}, true).expand().toString());
         var resultWithOptional = new Template(requestTemplate).expand({
             request: {
                 params: {
@@ -144,9 +145,34 @@ describe('Request template', function() {
                 }
             }
         });
-        assert.deepEqual(resultWithOptional.uri, new URI('/en.wikipedia.org/path1{/optional}', {}, true).expand({
+        assert.deepEqual(resultWithOptional.uri.toString(), new URI('/en.wikipedia.org/path1{/optional}', {}, true).expand({
             optional: 'value'
-        }));
+        }).toString());
+    });
+
+    it('should terminate when an optional path segment is missing', function() {
+        var requestTemplate = {
+            uri: '/{domain}{/a}{/b}{+path}'
+        };
+        var resultNoOptional = new Template(requestTemplate).expand({
+            request: {
+                params: {
+                    domain: 'en.wikipedia.org',
+                    b: 'b',
+                }
+            }
+        }).uri.toString();
+        assert.deepEqual(resultNoOptional, '/en.wikipedia.org');
+        var resultWithOptional = new Template(requestTemplate).expand({
+            request: {
+                params: {
+                    domain: 'en.wikipedia.org',
+                    a: 'a',
+                    path: 'path'
+                }
+            }
+        }).uri.toString();
+        assert.deepEqual(resultWithOptional, '/en.wikipedia.org/a');
     });
 
     it('should support + templates in path', function() {
@@ -157,27 +183,21 @@ describe('Request template', function() {
             request: {
                 params: {
                     domain: 'en.wikipedia.org',
-                    path: [
-                        'test1',
-                        'test2',
-                        'test3'
-                    ]
+                    path: 'test1/test2/test3'
                 }
             }
         });
-        assert.deepEqual(result.uri,
+        assert.deepEqual(result.uri.toString(),
         new URI('http://en.wikipedia.org/path1/{+path}', {}, true).expand({
             path: [
-                'test1',
-                'test2',
-                'test3'
+                'test1/test2/test3'
             ]
-        }));
+        }).toString());
     });
 
     it('should support templating the whole uri', function() {
         var requestTemplate = {
-            uri: '{uri}'
+            uri: '{+uri}'
         };
         var result = new Template(requestTemplate).expand({
             request: {
@@ -186,7 +206,7 @@ describe('Request template', function() {
                 }
             }
         });
-        assert.deepEqual(result.uri, new URI('en.wikipedia.org/path1/test1/test2/test3', {}, false));
+        assert.deepEqual(result.uri.toString(), 'en.wikipedia.org/path1/test1/test2/test3');
     });
 
     it('absolute templates in URI', function() {
@@ -205,7 +225,7 @@ describe('Request template', function() {
 
     it('supports default values in req templates', function() {
         var template = new Template({
-            uri: '/path/{$$.default($.request.body.test, "default")}',
+            uri: '/path/{$$.default($.request.body.test, "foo/bar")}',
             body: {
                 complete: '{$$.default($.request.body.test, "default")}',
                 partial: '/test/{$$.default($.request.body.test, "default")}',
@@ -230,7 +250,7 @@ describe('Request template', function() {
                 body: {}
             }
         });
-        assert.deepEqual(evaluatedDefaults.uri, '/path/default');
+        assert.deepEqual(evaluatedDefaults.uri, '/path/foo%2Fbar');
         assert.deepEqual(evaluatedDefaults.body.complete, 'default');
         assert.deepEqual(evaluatedDefaults.body.partial, '/test/default');
         assert.deepEqual(evaluatedDefaults.body.withObject, {temp: 'default'});

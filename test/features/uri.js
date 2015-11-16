@@ -118,7 +118,6 @@ describe('URI', function() {
 
     it('handle protocols', function() {
         var uri = new URI('https://test.com/v1/page/title');
-        deepEqual(uri.urlObj.protocol, 'https:');
         deepEqual(uri.path[0], 'v1');
         deepEqual(uri.toString(), 'https://test.com/v1/page/title');
     });
