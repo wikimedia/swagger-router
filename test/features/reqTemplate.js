@@ -5,7 +5,7 @@
 
 var URI = require('../../index').URI;
 var Template = require('../../index').Template;
-var assert = require('../utils/assert');
+var assert = require('assert');
 
 describe('Request template', function() {
     it('should correctly resolve request templates', function() {
@@ -29,7 +29,7 @@ describe('Request template', function() {
                 'nested': {
                     'one': {
                         'two': {
-                            'tree': '{a.b.c}'
+                            'tree': '{request.body.a.b.c}'
                         }
                     }
                 },
@@ -103,7 +103,7 @@ describe('Request template', function() {
                 field: 'additional_test_value'
             }
         });
-        assert.deepEqual(result + '', expectedTemplatedRequest + '');
+        assert.deepEqual(result, expectedTemplatedRequest);
     });
 
     it('should encode uri components', function() {
@@ -150,7 +150,7 @@ describe('Request template', function() {
         }).toString());
     });
 
-    it('should terminate when an optional path segment is missing', function() {
+    it('should omit optional path segments', function() {
         var requestTemplate = {
             uri: '/{domain}{/a}{/b}{+path}'
         };
@@ -159,16 +159,17 @@ describe('Request template', function() {
                 params: {
                     domain: 'en.wikipedia.org',
                     b: 'b',
+                    path: '/path'
                 }
             }
         }).uri.toString();
-        assert.deepEqual(resultNoOptional, '/en.wikipedia.org');
+        console.log(resultNoOptional);
+        assert.deepEqual(resultNoOptional, '/en.wikipedia.org/b/path');
         var resultWithOptional = new Template(requestTemplate).expand({
             request: {
                 params: {
                     domain: 'en.wikipedia.org',
                     a: 'a',
-                    path: 'path'
                 }
             }
         }).uri.toString();
