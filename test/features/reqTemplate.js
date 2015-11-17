@@ -415,10 +415,39 @@ describe('Request template', function() {
             }
         });
         var request = {
-            method: 'get',
             headers: {
                 bar: 'a/bar',
                 baz: 'a/baz',
+            },
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            },
+            params: {
+                foo: 'a/foo',
+            }
+        };
+        var result = template.expand({ request: request, options: { host: '/a/host' } });
+        assert.deepEqual(result, {
+            uri: '/a/host/a%2Ffoo/',
+            headers: {
+                bar: 'a/bar',
+                // FIXME: This will change in the future!
+                baz: 'a/baz',
+            }
+        });
+    });
+
+    it('should support filtering', function() {
+        var template = new Template({
+            uri: '{{options.host}}/{foo}/',
+            headers: '{{filter(request.headers, ["bar","baz"])}}',
+        });
+        var request = {
+            headers: {
+                bar: 'a/bar',
+                baz: 'a/baz',
+                boo: 'a/boo',
             },
             uri: 'test.com',
             body: {
