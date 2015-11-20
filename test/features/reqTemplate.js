@@ -5,7 +5,7 @@
 
 var URI = require('../../index').URI;
 var Template = require('../../index').Template;
-var assert = require('../utils/assert');
+var assert = require('assert');
 
 describe('Request template', function() {
     it('should correctly resolve request templates', function() {
@@ -29,7 +29,7 @@ describe('Request template', function() {
                 'nested': {
                     'one': {
                         'two': {
-                            'tree': '{a.b.c}'
+                            'tree': '{request.body.a.b.c}'
                         }
                     }
                 },
@@ -103,7 +103,7 @@ describe('Request template', function() {
                 field: 'additional_test_value'
             }
         });
-        assert.deepEqual(result + '', expectedTemplatedRequest + '');
+        assert.deepEqual(result, expectedTemplatedRequest);
     });
 
     it('should encode uri components', function() {
@@ -150,7 +150,7 @@ describe('Request template', function() {
         }).toString());
     });
 
-    it('should terminate when an optional path segment is missing', function() {
+    it('should omit optional path segments', function() {
         var requestTemplate = {
             uri: '/{domain}{/a}{/b}{+path}'
         };
@@ -159,16 +159,17 @@ describe('Request template', function() {
                 params: {
                     domain: 'en.wikipedia.org',
                     b: 'b',
+                    path: '/path'
                 }
             }
         }).uri.toString();
-        assert.deepEqual(resultNoOptional, '/en.wikipedia.org');
+        console.log(resultNoOptional);
+        assert.deepEqual(resultNoOptional, '/en.wikipedia.org/b/path');
         var resultWithOptional = new Template(requestTemplate).expand({
             request: {
                 params: {
                     domain: 'en.wikipedia.org',
                     a: 'a',
-                    path: 'path'
                 }
             }
         }).uri.toString();
@@ -361,5 +362,110 @@ describe('Request template', function() {
         assert.deepEqual(result.body.not_removed_field, 'value');
         assert.deepEqual(result.body.removed_field1, undefined);
         assert.deepEqual(result.body.removed_field2, undefined);
+    });
+
+    /**
+     * New-style un-prefixed globals & calls
+     */
+
+    it('should support un-prefixed dotted paths & the global accessor', function() {
+        var template = new Template('{request[request.body.field]}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, 'get');
+    });
+
+    it('should support un-prefixed calls', function() {
+        var template = new Template('{default(request.foo, request[request.body.field])}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, 'get');
+    });
+
+    it('should support double brace syntax', function() {
+        var template = new Template('{{default(request.foo, request[request.body.field])}}');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, 'get');
+    });
+
+    it('should support double brace syntax in uri as well', function() {
+        var template = new Template({
+            uri: '{{options.host}}/{foo}/',
+            headers: {
+                bar: '{{bar}}',
+                baz: '{baz}',
+            }
+        });
+        var request = {
+            headers: {
+                bar: 'a/bar',
+                baz: 'a/baz',
+            },
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            },
+            params: {
+                foo: 'a/foo',
+            }
+        };
+        var result = template.expand({ request: request, options: { host: '/a/host' } });
+        assert.deepEqual(result, {
+            uri: '/a/host/a%2Ffoo/',
+            headers: {
+                bar: 'a/bar',
+                // FIXME: This will change in the future!
+                baz: 'a/baz',
+            }
+        });
+    });
+
+    it('should support filtering', function() {
+        var template = new Template({
+            uri: '{{options.host}}/{foo}/',
+            headers: '{{filter(request.headers, ["bar","baz"])}}',
+        });
+        var request = {
+            headers: {
+                bar: 'a/bar',
+                baz: 'a/baz',
+                boo: 'a/boo',
+            },
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            },
+            params: {
+                foo: 'a/foo',
+            }
+        };
+        var result = template.expand({ request: request, options: { host: '/a/host' } });
+        assert.deepEqual(result, {
+            uri: '/a/host/a%2Ffoo/',
+            headers: {
+                bar: 'a/bar',
+                // FIXME: This will change in the future!
+                baz: 'a/baz',
+            }
+        });
     });
 });
