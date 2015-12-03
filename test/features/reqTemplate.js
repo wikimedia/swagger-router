@@ -470,16 +470,21 @@ describe('Request template', function() {
 
     it('should correctly resolve 0 value', function() {
         var template = new Template({
+            uri: 'http://test.com/{rev}',
             headers: 'test_{test_header}'
         });
         var result = template.expand({
             request: {
+                params: {
+                    rev: 0
+                },
                 headers: {
                     test_header: 0
                 }
             }
         });
         assert.deepEqual(result, {
+            uri: 'http://test.com/0',
             headers: 'test_0'
         });
     });
