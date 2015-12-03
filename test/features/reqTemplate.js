@@ -163,7 +163,6 @@ describe('Request template', function() {
                 }
             }
         }).uri.toString();
-        console.log(resultNoOptional);
         assert.deepEqual(resultNoOptional, '/en.wikipedia.org/b/path');
         var resultWithOptional = new Template(requestTemplate).expand({
             request: {
@@ -466,6 +465,22 @@ describe('Request template', function() {
                 // FIXME: This will change in the future!
                 baz: 'a/baz',
             }
+        });
+    });
+
+    it('should correctly resolve 0 value', function() {
+        var template = new Template({
+            headers: 'test_{test_header}'
+        });
+        var result = template.expand({
+            request: {
+                headers: {
+                    test_header: 0
+                }
+            }
+        });
+        assert.deepEqual(result, {
+            headers: 'test_0'
         });
     });
 });
