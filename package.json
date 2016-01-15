@@ -1,6 +1,6 @@
 {
   "name": "swagger-router",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "An efficient swagger 2 based router with support for multiple APIs. For use in RESTBase.",
   "main": "index.js",
   "scripts": {
@@ -25,7 +25,7 @@
     "url": "https://github.com/gwicke/swagger-router/issues"
   },
   "dependencies": {
-    "bluebird": "2.8.2",
+    "bluebird": "^3.0.6",
     "core-js": "^1.2.6",
     "js-yaml": "^3.4.2",
     "tassembly": "^0.2.2",
