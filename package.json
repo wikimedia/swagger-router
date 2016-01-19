@@ -1,6 +1,6 @@
 {
   "name": "swagger-router",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "An efficient swagger 2 based router with support for multiple APIs. For use in RESTBase.",
   "main": "index.js",
   "scripts": {
@@ -25,18 +25,18 @@
     "url": "https://github.com/gwicke/swagger-router/issues"
   },
   "dependencies": {
-    "bluebird": "2.8.2",
-    "core-js": "^1.2.6",
-    "js-yaml": "^3.4.2",
-    "tassembly": "^0.2.2",
-    "template-expression-compiler": "^0.1.6"
+    "bluebird": "^3.1.1",
+    "core-js": "^2.0.3",
+    "js-yaml": "^3.5.2",
+    "tassembly": "^0.2.3",
+    "template-expression-compiler": "^0.1.8"
   },
   "devDependencies": {
-    "mocha": "^2.2.5",
-    "mocha-jshint": "^2.2.3",
-    "istanbul": "^0.3.15",
-    "mocha-lcov-reporter": "^0.0.2",
-    "coveralls": "^2.11.2",
-    "mocha-jscs": "^1.2.0"
+    "mocha": "^2.3.4",
+    "mocha-jshint": "^2.2.6",
+    "istanbul": "^0.4.2",
+    "mocha-lcov-reporter": "^1.0.0",
+    "coveralls": "^2.11.6",
+    "mocha-jscs": "^4.0.0"
   }
 }
