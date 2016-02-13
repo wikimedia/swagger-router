@@ -463,7 +463,6 @@ describe('Request template', function() {
             uri: '/a/host/a%2Ffoo/',
             headers: {
                 bar: 'a/bar',
-                // FIXME: This will change in the future!
                 baz: 'a/baz',
             }
         });
@@ -493,7 +492,6 @@ describe('Request template', function() {
             uri: '/a/host/a%2Ffoo/',
             headers: {
                 bar: 'a/bar',
-                // FIXME: This will change in the future!
                 baz: 'a/baz',
             }
         });
