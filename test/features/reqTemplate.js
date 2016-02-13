@@ -468,6 +468,36 @@ describe('Request template', function() {
         });
     });
 
+    it('should support newlines in expressions', function() {
+        var template = new Template({
+            uri: '{{options.host}}/{foo}/',
+            headers: '{{filter(\nrequest.headers, \n["bar","baz"])\n }}',
+        });
+        var request = {
+            headers: {
+                bar: 'a/bar',
+                baz: 'a/baz',
+                boo: 'a/boo',
+            },
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            },
+            params: {
+                foo: 'a/foo',
+            }
+        };
+        var result = template.expand({ request: request, options: { host: '/a/host' } });
+        assert.deepEqual(result, {
+            uri: '/a/host/a%2Ffoo/',
+            headers: {
+                bar: 'a/bar',
+                // FIXME: This will change in the future!
+                baz: 'a/baz',
+            }
+        });
+    });
+
     it('should correctly resolve 0 value', function() {
         var template = new Template({
             uri: 'http://test.com/{rev}',
