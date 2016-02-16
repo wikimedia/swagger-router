@@ -13,28 +13,28 @@ describe('Request template', function() {
             uri: '/{domain}/test',
             method: 'post',
             headers: {
-                'name-with-dashes': '{name-with-dashes}',
-                'global-header': '{$.request.params.domain}',
+                'name-with-dashes': '{{name-with-dashes}}',
+                'global-header': '{{request.params.domain}}',
                 'added-string-header': 'added-string-header'
             },
             query: {
-                'simple': '{simple}',
+                'simple': '{{simple}}',
                 'added': 'addedValue',
-                'global': '{$.request.headers.name-with-dashes}'
+                'global': '{{request.headers.name-with-dashes}}'
             },
             body: {
-                'object': '{object}',
-                'global': '{$.request.params.domain}',
+                'object': '{{object}}',
+                'global': '{{request.params.domain}}',
                 'added': 'addedValue',
                 'nested': {
                     'one': {
                         'two': {
-                            'tree': '{request.body.a.b.c}'
+                            'tree': '{{request.body.a.b.c}}'
                         }
                     }
                 },
-                'field_name_with_underscore': '{field_name_with_underscore}',
-                'additional_context_field': '{$.additional_context.field}',
+                'field_name_with_underscore': '{{field_name_with_underscore}}',
+                'additional_context_field': '{{additional_context.field}}',
                 'string_templated': 'test {field_name_with_underscore}'
             }
         };
@@ -63,7 +63,7 @@ describe('Request template', function() {
                         'c': 'nestedValue'
                     }
                 },
-                'field_name_with_underscore': 'field_value_with_underscore'
+                'field_name_with_underscore': 'field_value_with_underscore/'
             }
         };
         var expectedTemplatedRequest = {
@@ -92,9 +92,11 @@ describe('Request template', function() {
                         }
                     }
                 },
-                'field_name_with_underscore': 'field_value_with_underscore',
+                'field_name_with_underscore': 'field_value_with_underscore/',
                 additional_context_field: 'additional_test_value',
-                'string_templated': 'test field_value_with_underscore'
+                // Note how the slash is encoded, as the template is using
+                // single braces.
+                'string_templated': 'test field_value_with_underscore%2F'
             }
         };
         var result = new Template(requestTemplate).expand({
@@ -211,7 +213,7 @@ describe('Request template', function() {
 
     it('absolute templates in URI', function() {
         var template = new Template({
-            uri: '/path/{$.request.headers.host}/{$.request.body}'
+            uri: '/path/{request.headers.host}/{request.body}'
         });
         var request = {
             method: 'post',
@@ -225,11 +227,11 @@ describe('Request template', function() {
 
     it('supports default values in req templates', function() {
         var template = new Template({
-            uri: '/path/{$$.default($.request.body.test, "foo/bar")}',
+            uri: '/path/{default(request.body.test, "foo/bar")}',
             body: {
-                complete: '{$$.default($.request.body.test, "default")}',
-                partial: '/test/{$$.default($.request.body.test, "default")}',
-                withObject: '{$$.default($.request.body.test, {temp: "default"})}'
+                complete: '{{default(request.body.test, "default")}}',
+                partial: '/test/{{default(request.body.test, "default")}}',
+                withObject: '{{default(request.body.test, {temp: "default"})}}'
             }
         });
         var evaluatedNoDefaults = template.expand({
@@ -259,7 +261,7 @@ describe('Request template', function() {
     it('should support merging objects in templates', function() {
         var template = new Template({
             body: {
-                merged: '{$$.merge($.request.body.first, second)}'
+                merged: '{{merge(request.body.first, second)}}'
             }
         });
         var evaluated = template.expand({
@@ -285,7 +287,7 @@ describe('Request template', function() {
     });
 
     it('should support string templates', function() {
-        var template = new Template('{$.request}');
+        var template = new Template('{{request}}');
         var request = {
             method: 'get',
             uri: 'test.com',
@@ -298,7 +300,7 @@ describe('Request template', function() {
     });
 
     it('should support short notation in string templates', function() {
-        var template = new Template('{request}');
+        var template = new Template('{{request}}');
         var request = {
             method: 'get',
             uri: 'test.com',
@@ -311,7 +313,7 @@ describe('Request template', function() {
     });
 
     it('should support short nested notation in string templates', function() {
-        var template = new Template('{request.method}');
+        var template = new Template('{{request.method}}');
         var request = {
             method: 'get',
             uri: 'test.com',
@@ -324,7 +326,7 @@ describe('Request template', function() {
     });
 
     it('should support short nested notation with brackets in string templates', function() {
-        var template = new Template('{request[$.request.body.field]}');
+        var template = new Template('{{request[request.body.field]}}');
         var request = {
             method: 'get',
             uri: 'test.com',
@@ -340,8 +342,8 @@ describe('Request template', function() {
         var template = new Template({
             method: 'get',
             uri: 'test.com',
-            headers: '{$$.strip($.request.headers, "removed_header")}',
-            body: '{$$.strip($.request.body, ["removed_field1", "removed_field2"])}'
+            headers: '{{strip(request.headers, "removed_header")}}',
+            body: '{{strip(request.body, ["removed_field1", "removed_field2"])}}'
         });
         var result = template.expand({
             request: {
@@ -368,7 +370,7 @@ describe('Request template', function() {
      */
 
     it('should support un-prefixed dotted paths & the global accessor', function() {
-        var template = new Template('{request[request.body.field]}');
+        var template = new Template('{{request[request.body.field]}}');
         var request = {
             method: 'get',
             uri: 'test.com',
@@ -381,7 +383,7 @@ describe('Request template', function() {
     });
 
     it('should support un-prefixed calls', function() {
-        var template = new Template('{default(request.foo, request[request.body.field])}');
+        var template = new Template('{{default(request.foo, request[request.body.field])}}');
         var request = {
             method: 'get',
             uri: 'test.com',
@@ -432,8 +434,7 @@ describe('Request template', function() {
             uri: '/a/host/a%2Ffoo/',
             headers: {
                 bar: 'a/bar',
-                // FIXME: This will change in the future!
-                baz: 'a/baz',
+                baz: 'a%2Fbaz',
             }
         });
     });
@@ -462,7 +463,35 @@ describe('Request template', function() {
             uri: '/a/host/a%2Ffoo/',
             headers: {
                 bar: 'a/bar',
-                // FIXME: This will change in the future!
+                baz: 'a/baz',
+            }
+        });
+    });
+
+    it('should support newlines in expressions', function() {
+        var template = new Template({
+            uri: '{{options.host}}/{foo}/',
+            headers: '{{filter(\nrequest.headers, \n["bar","baz"])\n }}',
+        });
+        var request = {
+            headers: {
+                bar: 'a/bar',
+                baz: 'a/baz',
+                boo: 'a/boo',
+            },
+            uri: 'test.com',
+            body: {
+                field: 'method'
+            },
+            params: {
+                foo: 'a/foo',
+            }
+        };
+        var result = template.expand({ request: request, options: { host: '/a/host' } });
+        assert.deepEqual(result, {
+            uri: '/a/host/a%2Ffoo/',
+            headers: {
+                bar: 'a/bar',
                 baz: 'a/baz',
             }
         });
