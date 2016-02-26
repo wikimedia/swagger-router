@@ -40,7 +40,8 @@ var expectations = {
         params: {
             domain: 'en.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/page/': {
         value: '/page/',
@@ -48,7 +49,8 @@ var expectations = {
             _ls: [],
             domain: 'en.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/page/Foo': {
         value: '/page/{title}',
@@ -56,7 +58,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             title: 'Foo'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     // static listing of available formats
     '/en.wikipedia.org/v1/page/Foo/': {
@@ -66,7 +69,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             title: 'Foo'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/page/Foo/html': {
         value: '/page/{title}/html',
@@ -74,7 +78,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             title: 'Foo'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/transform/html/to/wikitext': {
         value: '/transform/html/to/{format}',
@@ -82,7 +87,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             format: 'wikitext'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     // static listing
     '/en.wikipedia.org/v1/transform/': {
@@ -91,7 +97,8 @@ var expectations = {
             _ls: ['html','wikitext'],
             domain: 'en.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     // static listing, another wiki
     '/de.wikipedia.org/v1/transform/': {
@@ -100,7 +107,8 @@ var expectations = {
             _ls: ['html','wikitext'],
             domain: 'de.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
 
     // double slashes
@@ -110,7 +118,8 @@ var expectations = {
             _ls: [''],
             domain: 'en.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/double//': {
         value: '/double//',
@@ -118,21 +127,24 @@ var expectations = {
             _ls: ['slash'],
             domain: 'en.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/double//slash': {
         value: '/double//slash',
         params: {
             domain: 'en.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/some/really/long/path': {
         value: '/some/really/long/path',
         params: {
             domain: 'en.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
 
     // Optional path segments
@@ -141,7 +153,8 @@ var expectations = {
         params: {
             domain: 'en.wikipedia.org'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/several/optional': {
         value: '/several{/optional}{/path}{+segments}',
@@ -149,7 +162,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             optional: 'optional'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/several/optional/path': {
         value: '/several{/optional}{/path}{+segments}',
@@ -158,7 +172,8 @@ var expectations = {
             optional: 'optional',
             path: 'path'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/several/optional/path/segments': {
         value: '/several{/optional}{/path}{+segments}',
@@ -168,7 +183,8 @@ var expectations = {
             path: 'path',
             segments: 'segments',
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/several/optional/path/segments/a': {
         value: '/several{/optional}{/path}{+segments}',
@@ -178,7 +194,8 @@ var expectations = {
             path: 'path',
             segments: 'segments/a',
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/several/optional/path/segments/a/b': {
         value: '/several{/optional}{/path}{+segments}',
@@ -188,7 +205,8 @@ var expectations = {
             path: 'path',
             segments: 'segments/a/b',
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/several/optional/path/a%2fb': {
         value: '/several{/optional}{/path}{+segments}',
@@ -198,7 +216,8 @@ var expectations = {
             path: 'path',
             segments: 'a%2Fb',
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/several/optional/path/segments/a%2fb': {
         value: '/several{/optional}{/path}{+segments}',
@@ -208,7 +227,8 @@ var expectations = {
             path: 'path',
             segments: 'segments/a%2Fb',
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/simple/templated': {
         value: '/simple/{templated}{/path}',
@@ -216,7 +236,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             templated: 'templated'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/simple/templated/path': {
         value: '/simple/{templated}{/path}',
@@ -225,7 +246,8 @@ var expectations = {
             templated: 'templated',
             path: 'path'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/simple/templated/path/toolong': null,
 
@@ -234,7 +256,8 @@ var expectations = {
             domain: 'en.wikipedia.org'
         },
         value: null,
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/optional/': {
         params: {
@@ -242,7 +265,8 @@ var expectations = {
             _ls: []
         },
         value: null,
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/optional/path': {
         value: '/optional/{+path}',
@@ -250,7 +274,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             path: 'path'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
     '/en.wikipedia.org/v1/optional/path/bits': {
         value: '/optional/{+path}',
@@ -258,7 +283,8 @@ var expectations = {
             domain: 'en.wikipedia.org',
             path: 'path/bits'
         },
-        permissions: []
+        permissions: [],
+        filters: []
     },
 
     // A few paths that should not match
