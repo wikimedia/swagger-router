@@ -29,8 +29,7 @@
     "core-js": "^2.0.3",
     "js-yaml": "^3.5.2",
     "tassembly": "^0.2.3",
-    "template-expression-compiler": "^0.1.8",
-    "rfc822-date": "^0.0.3"
+    "template-expression-compiler": "^0.1.8"
   },
   "devDependencies": {
     "mocha": "^2.3.4",

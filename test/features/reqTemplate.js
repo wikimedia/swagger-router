@@ -565,7 +565,7 @@ describe('Request template', function() {
         assert.deepEqual(result, {
             body: {
                 date_iso: '1970-01-01T00:00:01.234Z',
-                date_rfc822: require('rfc822-date')(new Date(1234))
+                date_rfc822: 'Thu, 01 Jan 1970 00:00:01 +0000'
             }
         });
     });
