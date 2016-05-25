@@ -547,4 +547,26 @@ describe('Request template', function() {
             headers: 'test_0'
         });
     });
+
+    it('should support date formats', function() {
+        var template = new Template({
+            body: {
+                date_iso: '{{date(request.body.date, "iso")}}',
+                date_rfc822: '{{date(request.body.date)}}'
+            }
+        });
+        var result = template.expand({
+            request: {
+                body: {
+                    date: '1234'
+                }
+            }
+        });
+        assert.deepEqual(result, {
+            body: {
+                date_iso: '1970-01-01T00:00:01.234Z',
+                date_rfc822: 'Thu, 01 Jan 1970 00:00:01 +0000'
+            }
+        });
+    });
 });
