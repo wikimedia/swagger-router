@@ -1,6 +1,6 @@
 {
   "name": "swagger-router",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "An efficient swagger 2 based router with support for multiple APIs. For use in RESTBase.",
   "main": "index.js",
   "scripts": {
@@ -29,7 +29,8 @@
     "core-js": "^2.0.3",
     "js-yaml": "^3.5.2",
     "tassembly": "^0.2.3",
-    "template-expression-compiler": "^0.1.8"
+    "template-expression-compiler": "^0.1.8",
+    "rfc822-date": "^0.0.3"
   },
   "devDependencies": {
     "mocha": "^2.3.4",
