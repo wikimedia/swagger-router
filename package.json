@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/gwicke/swagger-router.git"
+    "url": "https://github.com/wikimedia/swagger-router.git"
   },
   "keywords": [
     "swagger2",
@@ -19,10 +19,15 @@
     "tree",
     "restbase"
   ],
-  "author": "Gabriel Wicke <gwicke@wikimedia.org>",
+  "author": "Wikimedia Services Team <services@lists.wikimedia.org>",
+  "contributors": [
+    "Gabriel Wicke <gwicke@wikimedia.org>",
+    "Petr Pchelko <ppchelko@wikimedia.org>",
+    "Marko Obrovac <mobrovac@wikimedia.org>"
+  ],
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/gwicke/swagger-router/issues"
+    "url": "https://github.com/wikimedia/swagger-router/issues"
   },
   "dependencies": {
     "bluebird": "^3.4.0",
