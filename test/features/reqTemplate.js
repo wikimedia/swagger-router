@@ -225,6 +225,17 @@ describe('Request template', function() {
         assert.deepEqual(template.expand({request:request}).uri, '/path/test/a');
     });
 
+    it('allows req.method to be templated', function() {
+        var template = new Template({
+            uri: '/foo/bar/baz',
+            method: '{{request.method}}'
+        });
+        var evalWithMethod = template.expand({ request: { method: 'post' } });
+        assert.deepEqual(evalWithMethod.method, 'post');
+        var evalWithoutMethod = template.expand({ request: {} });
+        assert.deepEqual(evalWithoutMethod.method, 'get');
+    });
+
     it('supports default values in req templates', function() {
         var template = new Template({
             uri: '/path/{default(request.body.test, "foo/bar")}',
