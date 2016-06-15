@@ -93,14 +93,14 @@ describe('URI', function() {
     it('append a suffix path', function() {
         var baseURI = new URI('/{domain:test.com}/v1', {}, true);
         var suffix = new URI('/page/{title}', {}, true);
-        var uri = new URI(baseURI.path.concat(suffix.path), {title: 'foo'});
+        var uri = new URI(baseURI.path.concat(suffix.path), {title: 'foo'}, true);
         deepEqual(uri.toString(), '/test.com/v1/page/foo', {}, true);
         deepEqual(uri.expand().path, ['test.com', 'v1', 'page', 'foo']);
     });
 
     it('remove a suffix path', function() {
         var basePath = new URI('/{domain:test.com}/v1/page/{title}', {}, true).path;
-        var uri = new URI(basePath.slice(0, basePath.length - 2));
+        var uri = new URI(basePath.slice(0, basePath.length - 2), {}, true);
         deepEqual(uri.toString(), '/test.com/v1');
     });
 
