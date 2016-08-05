@@ -569,6 +569,19 @@ describe('Request template', function() {
         var result = template.expand({
             request: {
                 body: {
+                    date: '1990-02-20T19:31:13+00:00'
+                }
+            }
+        });
+        assert.deepEqual(result, {
+            body: {
+                date_iso: '1990-02-20T19:31:13.000Z',
+                date_rfc822: 'Tue, 20 Feb 1990 19:31:13 +0000'
+            }
+        });
+        result = template.expand({
+            request: {
+                body: {
                     date: '1234'
                 }
             }
