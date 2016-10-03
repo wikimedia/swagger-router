@@ -1,6 +1,6 @@
 {
   "name": "swagger-router",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "An efficient swagger 2 based router with support for multiple APIs. For use in RESTBase.",
   "main": "index.js",
   "scripts": {
@@ -36,11 +36,13 @@
     "template-expression-compiler": "^0.1.8"
   },
   "devDependencies": {
-    "mocha": "^2.5.3",
+    "mocha": "^3.1.0",
     "mocha-jshint": "^2.3.1",
-    "istanbul": "^0.4.3",
+    "istanbul": "^0.4.5",
     "mocha-lcov-reporter": "^1.2.0",
-    "coveralls": "^2.11.9",
-    "mocha-jscs": "^5.0.0"
+    "coveralls": "^2.11.14",
+    "mocha-jscs": "^5.0.1",
+    "mocha-eslint":"^3.0.1",
+    "eslint-config-node-services": "^1.0.4"
   }
 }
