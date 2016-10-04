@@ -1,17 +1,10 @@
 {
-    "predef": [
-        "setImmediate",
-        "Map",
-        "Set",
-        "Promise"
-    ],
-
     "bitwise": true,
     "laxbreak": true,
     "curly": true,
     "eqeqeq": true,
     "immed": true,
-    "latedef": "nofunc",
+    "latedef": false,
     "newcap": true,
     "noarg": true,
     "noempty": true,
@@ -27,6 +20,7 @@
     "node": true,
 
     "nomen": false,
-    "loopfunc": true
+    "loopfunc": true,
+    "esnext": true
     //"onevar": true
 }
