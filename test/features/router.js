@@ -262,9 +262,10 @@ var expectations = {
     '/en.wikipedia.org/v1/optional/': {
         params: {
             domain: 'en.wikipedia.org',
+            path: '',
             _ls: []
         },
-        value: null,
+        value: '/optional/{+path}',
         permissions: [],
         filters: []
     },
@@ -273,6 +274,16 @@ var expectations = {
         params: {
             domain: 'en.wikipedia.org',
             path: 'path'
+        },
+        permissions: [],
+        filters: []
+    },
+    '/en.wikipedia.org/v1/optional/path/': {
+        value: '/optional/{+path}',
+        params: {
+            domain: 'en.wikipedia.org',
+            path: 'path/',
+            _ls: []
         },
         permissions: [],
         filters: []
