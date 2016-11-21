@@ -1,6 +1,6 @@
 {
   "name": "swagger-router",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "An efficient swagger 2 based router with support for multiple APIs. For use in RESTBase.",
   "main": "index.js",
   "scripts": {
