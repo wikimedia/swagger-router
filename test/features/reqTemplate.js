@@ -310,6 +310,19 @@ describe('Request template', function() {
         assert.deepEqual(result, request);
     });
 
+    it('should support string templates with trailing newlines', function() {
+        var template = new Template('{{request}}\n');
+        var request = {
+            method: 'get',
+            uri: 'test.com',
+            body: {
+                field: 'value'
+            }
+        };
+        var result = template.expand({ request: request });
+        assert.deepEqual(result, request);
+    });
+
     it('should support short notation in string templates', function() {
         var template = new Template('{{request}}');
         var request = {
