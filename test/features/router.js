@@ -29,7 +29,9 @@ var specs = [
             // Modifiers: optional path segments
             '/simple/{templated}{/path}': '/simple/{templated}{/path}',
             '/several{/optional}{/path}{+segments}': '/several{/optional}{/path}{+segments}',
-            '/optional/{+path}': '/optional/{+path}'
+            '/optional/{+path}': '/optional/{+path}',
+            '/overlapping/{wildcard}': '/overlapping/{wildcard}',
+            '/overlapping/concrete': '/overlapping/concrete',
         }
     }
 ];
@@ -293,6 +295,25 @@ var expectations = {
         params: {
             domain: 'en.wikipedia.org',
             path: 'path/bits'
+        },
+        permissions: [],
+        filters: []
+    },
+
+    // Overlapping paths
+    '/en.wikipedia.org/v1/overlapping/concrete': {
+        value: '/overlapping/concrete',
+        params: {
+            domain: 'en.wikipedia.org',
+        },
+        permissions: [],
+        filters: []
+    },
+    '/en.wikipedia.org/v1/overlapping/other': {
+        value: '/overlapping/{wildcard}',
+        params: {
+            domain: 'en.wikipedia.org',
+            wildcard: 'other',
         },
         permissions: [],
         filters: []
