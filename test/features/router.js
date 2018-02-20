@@ -374,3 +374,12 @@ describe('Repeat on cloned tree', function() {
         });
     });
 });
+
+describe.only('addSpec', function() {
+    it('should add a spec via `addSpec`', function() {
+        const testRouter = new Router();
+        const fullSpec = makeFullSpec();
+        testRouter.addSpec(fullSpec);
+        deepEqual(Object.keys(testRouter._root._children).length, 4)
+    })
+})
