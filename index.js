@@ -1,4 +1,4 @@
-"use strict";
+'use strict';
 
 module.exports = {
     Router: require('./lib/router'),
@@ -6,4 +6,3 @@ module.exports = {
     Node: require('./lib/node'),
     Template: require('./lib/reqTemplate')
 };
-

@@ -1,14 +1,12 @@
 "use strict";
 
-// mocha defines to avoid JSHint breakage
-/* global describe, it, before, beforeEach, after, afterEach */
 
 var URI = require('../../index').URI;
 var Template = require('../../index').Template;
 var assert = require('assert');
 
-describe('Request template', function() {
-    it('should correctly resolve request templates', function() {
+describe('Request template',() => {
+    it('should correctly resolve request templates',() => {
         var requestTemplate = {
             uri: '/{domain}/test',
             method: 'post',
@@ -108,7 +106,7 @@ describe('Request template', function() {
         assert.deepEqual(result, expectedTemplatedRequest);
     });
 
-    it('should encode uri components', function() {
+    it('should encode uri components',() => {
         var requestTemplate = {
             uri: 'http://{domain}/path1/{path2}'
         };
@@ -126,7 +124,7 @@ describe('Request template', function() {
         }).toString());
     });
 
-    it('should support optional path elements in uri template', function() {
+    it('should support optional path elements in uri template',() => {
         var requestTemplate = {
             uri: '/{domain}/path1{/optional}'
         };
@@ -152,7 +150,7 @@ describe('Request template', function() {
         }).toString());
     });
 
-    it('should omit optional path segments', function() {
+    it('should omit optional path segments',() => {
         var requestTemplate = {
             uri: '/{domain}{/a}{/b}{+path}'
         };
@@ -177,7 +175,7 @@ describe('Request template', function() {
         assert.deepEqual(resultWithOptional, '/en.wikipedia.org/a');
     });
 
-    it('should support + templates in path', function() {
+    it('should support + templates in path',() => {
         var requestTemplate = {
             uri: 'http://{domain}/path1/{+path}'
         };
@@ -197,7 +195,7 @@ describe('Request template', function() {
         }).toString());
     });
 
-    it('should support templating the whole uri', function() {
+    it('should support templating the whole uri',() => {
         var requestTemplate = {
             uri: '{+uri}'
         };
@@ -211,7 +209,7 @@ describe('Request template', function() {
         assert.deepEqual(result.uri.toString(), 'en.wikipedia.org/path1/test1/test2/test3');
     });
 
-    it('absolute templates in URI', function() {
+    it('absolute templates in URI',() => {
         var template = new Template({
             uri: '/path/{request.headers.host}/{request.body}'
         });
@@ -225,7 +223,7 @@ describe('Request template', function() {
         assert.deepEqual(template.expand({request:request}).uri, '/path/test/a');
     });
 
-    it('allows req.method to be templated', function() {
+    it('allows req.method to be templated',() => {
         var template = new Template({
             uri: '/foo/bar/baz',
             method: '{{request.method}}'
@@ -236,7 +234,7 @@ describe('Request template', function() {
         assert.deepEqual(evalWithoutMethod.method, 'get');
     });
 
-    it('supports default values in req templates', function() {
+    it('supports default values in req templates',() => {
         var template = new Template({
             uri: '/path/{default(request.body.test, "foo/bar")}',
             body: {
@@ -269,7 +267,7 @@ describe('Request template', function() {
         assert.deepEqual(evaluatedDefaults.body.withObject, {temp: 'default'});
     });
 
-    it('should support merging objects in templates', function() {
+    it('should support merging objects in templates',() => {
         var template = new Template({
             body: {
                 merged: '{{merge(request.body.first, second)}}'
@@ -297,7 +295,7 @@ describe('Request template', function() {
         });
     });
 
-    it('should support string templates', function() {
+    it('should support string templates',() => {
         var template = new Template('{{request}}');
         var request = {
             method: 'get',
@@ -310,7 +308,7 @@ describe('Request template', function() {
         assert.deepEqual(result, request);
     });
 
-    it('should support string templates with trailing newlines', function() {
+    it('should support string templates with trailing newlines',() => {
         var template = new Template('{{request}}\n');
         var request = {
             method: 'get',
@@ -323,7 +321,7 @@ describe('Request template', function() {
         assert.deepEqual(result, request);
     });
 
-    it('should support short notation in string templates', function() {
+    it('should support short notation in string templates',() => {
         var template = new Template('{{request}}');
         var request = {
             method: 'get',
@@ -336,7 +334,7 @@ describe('Request template', function() {
         assert.deepEqual(result, request);
     });
 
-    it('should support short nested notation in string templates', function() {
+    it('should support short nested notation in string templates',() => {
         var template = new Template('{{request.method}}');
         var request = {
             method: 'get',
@@ -349,7 +347,7 @@ describe('Request template', function() {
         assert.deepEqual(result, 'get');
     });
 
-    it('should support short nested notation with brackets in string templates', function() {
+    it('should support short nested notation with brackets in string templates',() => {
         var template = new Template('{{request[request.body.field]}}');
         var request = {
             method: 'get',
@@ -362,7 +360,7 @@ describe('Request template', function() {
         assert.deepEqual(result, 'get');
     });
 
-    it('should strip the object', function() {
+    it('should strip the object',() => {
         var template = new Template({
             method: 'get',
             uri: 'test.com',
@@ -393,7 +391,7 @@ describe('Request template', function() {
      * New-style un-prefixed globals & calls
      */
 
-    it('should support un-prefixed dotted paths & the global accessor', function() {
+    it('should support un-prefixed dotted paths & the global accessor',() => {
         var template = new Template('{{request[request.body.field]}}');
         var request = {
             method: 'get',
@@ -406,7 +404,7 @@ describe('Request template', function() {
         assert.deepEqual(result, 'get');
     });
 
-    it('should support un-prefixed calls', function() {
+    it('should support un-prefixed calls',() => {
         var template = new Template('{{default(request.foo, request[request.body.field])}}');
         var request = {
             method: 'get',
@@ -419,7 +417,7 @@ describe('Request template', function() {
         assert.deepEqual(result, 'get');
     });
 
-    it('should support double brace syntax', function() {
+    it('should support double brace syntax',() => {
         var template = new Template('{{default(request.foo, request[request.body.field])}}');
         var request = {
             method: 'get',
@@ -432,7 +430,7 @@ describe('Request template', function() {
         assert.deepEqual(result, 'get');
     });
 
-    it('should support double brace syntax in uri as well', function() {
+    it('should support double brace syntax in uri as well',() => {
         var template = new Template({
             uri: '{{options.host}}/{foo}/',
             headers: {
@@ -463,7 +461,7 @@ describe('Request template', function() {
         });
     });
 
-    it('should support filtering', function() {
+    it('should support filtering',() => {
         var template = new Template({
             uri: '{{options.host}}/{foo}/',
             headers: '{{filter(request.headers, ["bar","baz"])}}',
@@ -492,7 +490,7 @@ describe('Request template', function() {
         });
     });
 
-    it('should support newlines in expressions', function() {
+    it('should support newlines in expressions',() => {
         var template = new Template({
             uri: '{{options.host}}/{foo}/',
             headers: '{{filter(\nrequest.headers, \n["bar","baz"])\n }}',
@@ -521,7 +519,7 @@ describe('Request template', function() {
         });
     });
 
-    it('should support newlines in expressions', function() {
+    it('should support newlines in expressions',() => {
         var template = new Template({
             uri: '{{options.host}}/{foo}/',
             headers: '{{filter(\nrequest.headers, \n["bar","baz"])\n }}',
@@ -551,7 +549,7 @@ describe('Request template', function() {
         });
     });
 
-    it('should correctly resolve 0 value', function() {
+    it('should correctly resolve 0 value',() => {
         var template = new Template({
             uri: 'http://test.com/{rev}',
             headers: 'test_{test_header}'
@@ -572,7 +570,7 @@ describe('Request template', function() {
         });
     });
 
-    it('should support date formats', function() {
+    it('should support date formats',() => {
         var template = new Template({
             body: {
                 date_iso: '{{date(request.body.date, "iso")}}',

@@ -1,7 +1,5 @@
 "use strict";
 
-// mocha defines to avoid JSHint breakage
-/* global describe, it, before, beforeEach, after, afterEach */
 
 var deepEqual = require('../utils/assert').deepEqual;
 var Router = require('../../index').Router;
@@ -354,29 +352,29 @@ var fullSpec = makeFullSpec();
 var tree = router.specToTree(fullSpec);
 router.setTree(tree);
 
-describe('Set of lookups', function() {
+describe('Set of lookups',() => {
 
     Object.keys(expectations).forEach(function(key) {
         var val = expectations[key];
-        it('match: ' + JSON.stringify(key), function() {
+        it('match: ' + JSON.stringify(key),() => {
             deepEqual(router.lookup(key), val);
         });
     });
 });
 
 router.setTree(tree.clone());
-describe('Repeat on cloned tree', function() {
+describe('Repeat on cloned tree',() => {
 
     Object.keys(expectations).forEach(function(key) {
         var val = expectations[key];
-        it('match: ' + JSON.stringify(key), function() {
+        it('match: ' + JSON.stringify(key),() => {
             deepEqual(router.lookup(key), val);
         });
     });
 });
 
-describe('addSpec', function() {
-    it('should add a spec via `addSpec`', function() {
+describe('addSpec',() => {
+    it('should add a spec via `addSpec`',() => {
         const testRouter = new Router();
         const fullSpec = makeFullSpec();
         testRouter.addSpec(fullSpec);
