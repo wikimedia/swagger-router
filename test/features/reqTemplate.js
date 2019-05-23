@@ -202,11 +202,11 @@ describe('Request template',() => {
         var result = new Template(requestTemplate).expand({
             request: {
                 params: {
-                    uri: 'en.wikipedia.org/path1/test1/test2/test3'
+                    uri: 'https://en.wikipedia.org/path1/test1/test2/test3'
                 }
             }
         });
-        assert.deepEqual(result.uri.toString(), 'en.wikipedia.org/path1/test1/test2/test3');
+        assert.deepEqual(result.uri.toString(), 'https://en.wikipedia.org/path1/test1/test2/test3');
     });
 
     it('absolute templates in URI',() => {
@@ -220,7 +220,7 @@ describe('Request template',() => {
             },
             body: 'a'
         };
-        assert.deepEqual(template.expand({request:request}).uri, '/path/test/a');
+        assert.deepEqual(template.expand({request:request}).uri.toString(), '/path/test/a');
     });
 
     it('allows req.method to be templated',() => {
@@ -251,7 +251,7 @@ describe('Request template',() => {
                 }
             }
         });
-        assert.deepEqual(evaluatedNoDefaults.uri, '/path/value');
+        assert.deepEqual(evaluatedNoDefaults.uri.toString(), '/path/value');
         assert.deepEqual(evaluatedNoDefaults.body.complete, 'value');
         assert.deepEqual(evaluatedNoDefaults.body.partial, '/test/value');
         assert.deepEqual(evaluatedNoDefaults.body.withObject, 'value');
@@ -261,7 +261,7 @@ describe('Request template',() => {
                 body: {}
             }
         });
-        assert.deepEqual(evaluatedDefaults.uri, '/path/foo%2Fbar');
+        assert.deepEqual(evaluatedDefaults.uri.toString(), '/path/foo%2Fbar');
         assert.deepEqual(evaluatedDefaults.body.complete, 'default');
         assert.deepEqual(evaluatedDefaults.body.partial, '/test/default');
         assert.deepEqual(evaluatedDefaults.body.withObject, {temp: 'default'});
@@ -452,12 +452,10 @@ describe('Request template',() => {
             }
         };
         var result = template.expand({ request: request, options: { host: '/a/host' } });
-        assert.deepEqual(result, {
-            uri: '/a/host/a%2Ffoo/',
-            headers: {
+        assert.deepEqual(result.uri.toString(), '/a/host/a%2Ffoo/');
+        assert.deepEqual(result.headers, {
                 bar: 'a/bar',
                 baz: 'a%2Fbaz',
-            }
         });
     });
 
@@ -481,12 +479,10 @@ describe('Request template',() => {
             }
         };
         var result = template.expand({ request: request, options: { host: '/a/host' } });
-        assert.deepEqual(result, {
-            uri: '/a/host/a%2Ffoo/',
-            headers: {
-                bar: 'a/bar',
-                baz: 'a/baz',
-            }
+        assert.deepEqual(result.uri.toString(), '/a/host/a%2Ffoo/');
+        assert.deepEqual(result.headers, {
+            bar: 'a/bar',
+            baz: 'a/baz',
         });
     });
 
@@ -510,42 +506,10 @@ describe('Request template',() => {
             }
         };
         var result = template.expand({ request: request, options: { host: '/a/host' } });
-        assert.deepEqual(result, {
-            uri: '/a/host/a%2Ffoo/',
-            headers: {
-                bar: 'a/bar',
-                baz: 'a/baz',
-            }
-        });
-    });
-
-    it('should support newlines in expressions',() => {
-        var template = new Template({
-            uri: '{{options.host}}/{foo}/',
-            headers: '{{filter(\nrequest.headers, \n["bar","baz"])\n }}',
-        });
-        var request = {
-            headers: {
-                bar: 'a/bar',
-                baz: 'a/baz',
-                boo: 'a/boo',
-            },
-            uri: 'test.com',
-            body: {
-                field: 'method'
-            },
-            params: {
-                foo: 'a/foo',
-            }
-        };
-        var result = template.expand({ request: request, options: { host: '/a/host' } });
-        assert.deepEqual(result, {
-            uri: '/a/host/a%2Ffoo/',
-            headers: {
-                bar: 'a/bar',
-                // FIXME: This will change in the future!
-                baz: 'a/baz',
-            }
+        assert.deepEqual(result.uri.toString(), '/a/host/a%2Ffoo/');
+        assert.deepEqual(result.headers, {
+            bar: 'a/bar',
+            baz: 'a/baz',
         });
     });
 
@@ -564,10 +528,8 @@ describe('Request template',() => {
                 }
             }
         });
-        assert.deepEqual(result, {
-            uri: 'http://test.com/0',
-            headers: 'test_0'
-        });
+        assert.deepEqual(result.uri.toString(), 'http://test.com/0');
+        assert.deepEqual(result.headers, 'test_0');
     });
 
     it('should support date formats',() => {
@@ -603,5 +565,29 @@ describe('Request template',() => {
                 date_rfc822: 'Thu, 01 Jan 1970 00:00:01 +0000'
             }
         });
+    });
+    it('should return URI object for non-templated URIs', () => {
+        const TEST_URI = '/test/wiki/uri';
+        const template = new Template({
+            uri: TEST_URI
+        });
+        const result = template.expand({ request: {} });
+        assert.deepEqual(result.uri.constructor.name, 'URI');
+        assert.deepEqual(result.uri.toString(), TEST_URI);
+    });
+    it('should return URI object for complex templated URIs', () => {
+        const template = new Template({
+            uri: '/test/{param1}.{param2}'
+        });
+        const result = template.expand({
+            request: {
+                params: {
+                    param1: '1',
+                    param2: '2'
+                }
+            }
+        });
+        assert.deepEqual(result.uri.constructor.name, 'URI');
+        assert.deepEqual(result.uri.toString(), '/test/1.2');
     });
 });
